@@ -11,34 +11,20 @@ Takes a markdown resume as input, gathers Japan-specific details interactively, 
 - **Education support** - handles 卒業 (graduation) and 中途退学 (withdrawal) with optional reasons
 - **Multi-provider AI** - Anthropic, OpenAI, OpenRouter, Ollama, Claude CLI, Codex CLI
 - **AI output caching** - skips AI calls on re-runs unless `--no-cache` is passed
-- **PDF output** - rirekisho as a standard grid-form layout, shokumukeirekisho as a free-form document
+- **PDF output** - rirekisho as a standard grid-form layout (CoreGraphics), shokumukeirekisho as a free-form document
 - **Markdown output** - editable templates for both resume types
 
-## Implementations
+## Requirements
 
-### Swift (recommended)
+- macOS 15+
+- Swift 6.2 (Xcode or Swift toolchain)
 
-Native macOS CLI using CoreGraphics for PDF rendering. Japanese fonts render correctly via Hiragino Sans.
+## Build & Run
 
 ```bash
-cd swift
 swift build
-swift run jpresume convert ../examples/resume.md --provider claude-cli --format both
+swift run jpresume convert examples/resume.md --provider claude-cli --format both
 ```
-
-Requires: macOS 15+, Swift 6.2, Xcode or Swift toolchain.
-
-### Python
-
-Original implementation using fpdf2/reportlab for PDF rendering.
-
-```bash
-cd .  # project root
-uv sync
-uv run jpresume convert examples/resume.md --provider claude-cli --format both
-```
-
-Requires: Python 3.11+, uv.
 
 ## Usage
 
@@ -92,3 +78,9 @@ Japan-specific data is stored in `jpresume_config.yaml` alongside the input resu
 - Licenses and certifications
 - Motivation (志望動機), hobbies (趣味・特技), self-PR (自己PR)
 - Commute time, spouse, dependents
+
+## XcodeGen
+
+```bash
+xcodegen generate   # generates JPResume.xcodeproj from project.yml
+```
