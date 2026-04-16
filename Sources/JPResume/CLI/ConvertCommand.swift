@@ -46,6 +46,9 @@ struct ConvertCommand: AsyncParsableCommand {
     @Flag(name: [.short, .long], help: "Show detailed output")
     var verbose = false
 
+    @Flag(help: "Treat validation warnings as errors")
+    var strict = false
+
     func run() async throws {
         let inputURL = URL(fileURLWithPath: input)
         guard FileManager.default.fileExists(atPath: inputURL.path) else {
@@ -66,23 +69,86 @@ struct ConvertCommand: AsyncParsableCommand {
               + "\(western.education.count) education entries, "
               + "\(western.skills.count) skills")
 
-        if dryRun {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let json = try encoder.encode(western)
-            print("\nParsed resume data:")
-            print(String(data: json, encoding: .utf8)!)
-            print("\nDry run complete. No output generated.")
-            return
-        }
-
         // Step 2: Config
         print("\nStep 2: Gathering Japan-specific information...")
         let japanConfig = try ConfigManager.loadOrPrompt(
             path: configURL, western: western, forceReconfigure: reconfigure
         )
 
-        // Step 3: AI
+        // Compute content hash for all caches (markdown + config + schema version)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let configData = try? encoder.encode(japanConfig)
+        let cacheHash = AICache.contentHash(markdownContent: text, configData: configData)
+
+        // Step 3: Normalize
+        print("\nStep 3: Normalizing resume...")
+        let normalizedCache = outputURL.appendingPathComponent(".normalized_cache.json")
+        var normalized: NormalizedResume
+
+        if !noCache, let cached: NormalizedResume = AICache.load(from: normalizedCache, expectedHash: cacheHash) {
+            print("  Using cached normalized resume")
+            normalized = cached
+        } else {
+            let providerInstance = try ProviderFactory.create(provider: provider.rawValue, model: model)
+            print("  Using AI provider: \(providerInstance.name)")
+            let normalizer = ResumeNormalizer(provider: providerInstance, verbose: verbose)
+            normalized = try await normalizer.normalize(western: western, config: japanConfig)
+            try AICache.save(normalized, to: normalizedCache, contentHash: cacheHash)
+        }
+
+        // Step 4: Validate
+        print("\nStep 4: Validating...")
+        let validation = ResumeValidator.validate(normalized)
+        if validation.hasIssues {
+            ResumeValidator.printResult(validation)
+            if strict && !validation.isValid {
+                print("\nValidation errors found. Use --no-strict to continue anyway.")
+                throw ExitCode.failure
+            }
+        } else {
+            if let years = validation.totalYearsExperience {
+                print("  ✓ Valid — \(String(format: "%.1f", years)) years experience")
+            } else {
+                print("  ✓ Valid")
+            }
+        }
+
+        if dryRun {
+            let prettyEncoder = JSONEncoder()
+            prettyEncoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+
+            print("\nParsed resume (WesternResume):")
+            let westernJSON = try prettyEncoder.encode(western)
+            print(String(data: westernJSON, encoding: .utf8)!)
+
+            print("\nNormalized resume (NormalizedResume):")
+            let normalizedJSON = try prettyEncoder.encode(normalized)
+            print(String(data: normalizedJSON, encoding: .utf8)!)
+
+            print("\nDry run complete. No output generated.")
+            return
+        }
+
+        // Steps 5 & 6: Adapt and Render
+        let (rirekishoData, shokumukeirekishoData) = try await adapt(
+            normalized: normalized, config: japanConfig, outputURL: outputURL, cacheHash: cacheHash
+        )
+        try render(rirekisho: rirekishoData, shokumukeirekisho: shokumukeirekishoData, to: outputURL)
+
+        print("\nDone!")
+    }
+}
+
+// MARK: - Private helpers
+
+extension ConvertCommand {
+    private func adapt(
+        normalized: NormalizedResume,
+        config: JapanConfig,
+        outputURL: URL,
+        cacheHash: String
+    ) async throws -> (RirekishoData?, ShokumukeirekishoData?) {
         let generateRirekisho = !shokumukeirekishoOnly
         let generateShokumukeirekisho = !rirekishoOnly
 
@@ -92,46 +158,48 @@ struct ConvertCommand: AsyncParsableCommand {
         let rirekishoCache = outputURL.appendingPathComponent(".rirekisho_cache.json")
         let shokumuCache = outputURL.appendingPathComponent(".shokumukeirekisho_cache.json")
 
-        // Check caches
         if generateRirekisho && !noCache {
-            rirekishoData = AICache.load(from: rirekishoCache)
-            if rirekishoData != nil {
-                print("\nStep 3: Using cached 履歴書 data")
-            }
+            rirekishoData = AICache.load(from: rirekishoCache, expectedHash: cacheHash)
+            if rirekishoData != nil { print("\nStep 5: Using cached 履歴書 data") }
         }
         if generateShokumukeirekisho && !noCache {
-            shokumukeirekishoData = AICache.load(from: shokumuCache)
-            if shokumukeirekishoData != nil {
-                print("  Using cached 職務経歴書 data")
-            }
+            shokumukeirekishoData = AICache.load(from: shokumuCache, expectedHash: cacheHash)
+            if shokumukeirekishoData != nil { print("  Using cached 職務経歴書 data") }
         }
 
         let needsAI = (generateRirekisho && rirekishoData == nil)
             || (generateShokumukeirekisho && shokumukeirekishoData == nil)
 
         if needsAI {
-            print("\nStep 3: Translating and adapting with AI...")
+            print("\nStep 5: Translating and adapting with AI...")
             let ai = try ResumeAI(provider: provider.rawValue, model: model, verbose: verbose)
 
             if generateRirekisho && rirekishoData == nil {
                 print("  Generating 履歴書...")
                 rirekishoData = try await ai.generateRirekisho(
-                    western: western, config: japanConfig, era: era
+                    normalized: normalized, config: config, era: era
                 )
-                try AICache.save(rirekishoData!, to: rirekishoCache)
+                try AICache.save(rirekishoData!, to: rirekishoCache, contentHash: cacheHash)
             }
 
             if generateShokumukeirekisho && shokumukeirekishoData == nil {
                 print("  Generating 職務経歴書...")
                 shokumukeirekishoData = try await ai.generateShokumukeirekisho(
-                    western: western, config: japanConfig, era: era
+                    normalized: normalized, config: config, era: era
                 )
-                try AICache.save(shokumukeirekishoData!, to: shokumuCache)
+                try AICache.save(shokumukeirekishoData!, to: shokumuCache, contentHash: cacheHash)
             }
         }
 
-        // Step 4: Render
-        print("\nStep 4: Generating output files...")
+        return (rirekishoData, shokumukeirekishoData)
+    }
+
+    private func render(
+        rirekisho rirekishoData: RirekishoData?,
+        shokumukeirekisho shokumukeirekishoData: ShokumukeirekishoData?,
+        to outputURL: URL
+    ) throws {
+        print("\nStep 6: Generating output files...")
         try FileManager.default.createDirectory(at: outputURL, withIntermediateDirectories: true)
 
         let wantMarkdown = format == .markdown || format == .both
@@ -164,8 +232,6 @@ struct ConvertCommand: AsyncParsableCommand {
                 print("  ✓ \(path.path)")
             }
         }
-
-        print("\nDone!")
     }
 }
 
