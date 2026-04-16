@@ -49,6 +49,12 @@ struct ConvertCommand: AsyncParsableCommand {
     @Flag(help: "Treat validation warnings as errors")
     var strict = false
 
+    @Flag(help: "Include personal/side projects in 職務経歴書")
+    var includeSideProjects = false
+
+    @Flag(help: "Exclude older irrelevant roles from 職務経歴書")
+    var excludeOlderRoles = false
+
     func run() async throws {
         let inputURL = URL(fileURLWithPath: input)
         guard FileManager.default.fileExists(atPath: inputURL.path) else {
@@ -114,6 +120,21 @@ struct ConvertCommand: AsyncParsableCommand {
             }
         }
 
+        // Step 4b: Consistency check and repair
+        print("\nStep 4b: Checking consistency and repairing...")
+        normalized = ResumeConsistencyChecker.check(normalized)
+        if !normalized.repairs.isEmpty {
+            for repair in normalized.repairs {
+                print("  ⚙ \(repair.field): \(repair.reason)")
+            }
+        }
+        if let derived = normalized.derivedExperience {
+            print("  Derived: \(derived.totalSoftwareYears) years total software experience")
+            if let ios = derived.iosYears { print("  Derived: \(ios) years iOS experience") }
+            if let jp = derived.jpWorkYears { print("  Derived: \(jp) years Japan-based work") }
+            if derived.hasInternationalTeamExperience { print("  Derived: international team experience detected") }
+        }
+
         if dryRun {
             let prettyEncoder = JSONEncoder()
             prettyEncoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -130,11 +151,22 @@ struct ConvertCommand: AsyncParsableCommand {
             return
         }
 
-        // Steps 5 & 6: Adapt and Render
-        let (rirekishoData, shokumukeirekishoData) = try await adapt(
-            normalized: normalized, config: japanConfig, outputURL: outputURL, cacheHash: cacheHash
+        // Steps 5 & 6: Adapt, Polish, and Render
+        let genOptions = GenerationOptions(
+            includeSideProjects: includeSideProjects,
+            includeOlderIrrelevantRoles: !excludeOlderRoles
         )
-        try render(rirekisho: rirekishoData, shokumukeirekisho: shokumukeirekishoData, to: outputURL)
+        let (rirekishoData, shokumukeirekishoData) = try await adapt(
+            normalized: normalized, config: japanConfig, outputURL: outputURL,
+            cacheHash: cacheHash, options: genOptions
+        )
+
+        // Step 5b: Polish generated content with deterministic rules
+        let derived = normalized.derivedExperience
+        let polishedRirekisho = rirekishoData.map { JapanesePolishRules.polish($0, derived: derived) }
+        let polishedShokumu = shokumukeirekishoData.map { JapanesePolishRules.polish($0, derived: derived) }
+
+        try render(rirekisho: polishedRirekisho, shokumukeirekisho: polishedShokumu, to: outputURL)
 
         print("\nDone!")
     }
@@ -147,7 +179,8 @@ extension ConvertCommand {
         normalized: NormalizedResume,
         config: JapanConfig,
         outputURL: URL,
-        cacheHash: String
+        cacheHash: String,
+        options: GenerationOptions = GenerationOptions()
     ) async throws -> (RirekishoData?, ShokumukeirekishoData?) {
         let generateRirekisho = !shokumukeirekishoOnly
         let generateShokumukeirekisho = !rirekishoOnly
@@ -185,7 +218,7 @@ extension ConvertCommand {
             if generateShokumukeirekisho && shokumukeirekishoData == nil {
                 print("  Generating 職務経歴書...")
                 shokumukeirekishoData = try await ai.generateShokumukeirekisho(
-                    normalized: normalized, config: config, era: era
+                    normalized: normalized, config: config, era: era, options: options
                 )
                 try AICache.save(shokumukeirekishoData!, to: shokumuCache, contentHash: cacheHash)
             }
