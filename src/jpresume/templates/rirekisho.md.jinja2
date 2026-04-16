@@ -1,0 +1,94 @@
+# 履歴書
+
+**作成日**: {{ creation_date }}
+
+---
+
+## 基本情報
+
+| 項目 | 内容 |
+|------|------|
+| ふりがな | {{ name_furigana }} |
+| 氏名 | {{ name_kanji }} |
+| 生年月日 | {{ date_of_birth }} |
+{% if gender %}| 性別 | {{ gender }} |
+{% endif %}
+
+## 連絡先
+
+| 項目 | 内容 |
+|------|------|
+{% if postal_code %}| 〒 | {{ postal_code }} |
+{% endif %}{% if address %}| 住所 | {{ address }} |
+{% endif %}{% if address_furigana %}| ふりがな | {{ address_furigana }} |
+{% endif %}{% if phone %}| 電話番号 | {{ phone }} |
+{% endif %}{% if email %}| メール | {{ email }} |
+{% endif %}
+
+{% if contact_address %}
+### 連絡先（現住所以外）
+
+| 項目 | 内容 |
+|------|------|
+{% if contact_postal_code %}| 〒 | {{ contact_postal_code }} |
+{% endif %}| 住所 | {{ contact_address }} |
+{% if contact_address_furigana %}| ふりがな | {{ contact_address_furigana }} |
+{% endif %}
+{% endif %}
+
+---
+
+## 学歴・職歴
+
+### 学歴
+
+| 年月 | 事項 |
+|------|------|
+{% for date, event in education_history %}| {{ date }} | {{ event }} |
+{% endfor %}
+
+### 職歴
+
+| 年月 | 事項 |
+|------|------|
+{% for date, event in work_history %}| {{ date }} | {{ event }} |
+{% endfor %}|  | 以上 |
+
+---
+
+{% if licenses %}
+## 免許・資格
+
+| 年月 | 免許・資格 |
+|------|-----------|
+{% for date, name in licenses %}| {{ date }} | {{ name }} |
+{% endfor %}
+
+---
+{% endif %}
+
+{% if motivation %}
+## 志望動機
+
+{{ motivation }}
+
+---
+{% endif %}
+
+{% if hobbies %}
+## 趣味・特技
+
+{{ hobbies }}
+
+---
+{% endif %}
+
+## その他
+
+| 項目 | 内容 |
+|------|------|
+{% if commute_time %}| 通勤時間 | {{ commute_time }} |
+{% endif %}{% if spouse is not none %}| 配偶者 | {{ "有" if spouse else "無" }} |
+{% endif %}{% if dependents is not none %}| 扶養家族数 | {{ dependents }}人 |
+{% endif %}{% if dependents_excl_spouse is not none %}| 扶養家族数（配偶者を除く） | {{ dependents_excl_spouse }}人 |
+{% endif %}
