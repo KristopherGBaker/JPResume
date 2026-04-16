@@ -7,10 +7,12 @@ Takes a markdown resume as input, gathers Japan-specific details interactively, 
 ## Features
 
 - **Markdown resume parser** - handles H2, H3, and bold-text section headings
+- **LLM normalization** - structures ambiguous dates, classifies bullets as achievements vs responsibilities, categorizes skills
+- **Validation** - checks date ranges, overlapping roles, current role consistency, total years of experience
 - **Interactive config** - prompts for Japan-specific fields (kanji name, furigana, address, education dates, etc.), saves to YAML for reuse
 - **Education support** - handles 卒業 (graduation) and 中途退学 (withdrawal) with optional reasons
 - **Multi-provider AI** - Anthropic, OpenAI, OpenRouter, Ollama, Claude CLI, Codex CLI
-- **AI output caching** - skips AI calls on re-runs unless `--no-cache` is passed
+- **Content-based caching** - all AI output cached with SHA-256 content hashing; automatically invalidated when inputs change
 - **PDF output** - rirekisho as a standard grid-form layout (CoreGraphics), shokumukeirekisho as a free-form document
 - **Markdown output** - editable templates for both resume types
 
@@ -45,18 +47,19 @@ swift run jpresume convert examples/resume.md --provider claude-cli --format bot
 jpresume convert <input.md> [options]
 
 Options:
-  -o, --output-dir DIR       Output directory (default: same as input)
-  -c, --config PATH          Config file path (default: {input_dir}/jpresume_config.yaml)
-  --reconfigure              Re-prompt for all Japan-specific fields
+  -o, --output-dir DIR          Output directory (default: same as input)
+  -c, --config PATH             Config file path (default: {input_dir}/jpresume_config.yaml)
+  --reconfigure                 Re-prompt for all Japan-specific fields
   --format {markdown,pdf,both}  Output format (default: both)
-  --rirekisho-only           Generate only the rirekisho (履歴書)
-  --shokumukeirekisho-only   Generate only the shokumukeirekisho (職務経歴書)
-  --provider PROVIDER        AI provider (default: ollama)
-  --model MODEL              Model name override
-  --era {western,japanese}   Date format: 2024年3月 vs 令和6年3月 (default: western)
-  --no-cache                 Ignore cached AI output and regenerate
-  --dry-run                  Parse and analyze only
-  -v, --verbose              Show AI prompts/responses
+  --rirekisho-only              Generate only the rirekisho (履歴書)
+  --shokumukeirekisho-only      Generate only the shokumukeirekisho (職務経歴書)
+  --provider PROVIDER           AI provider (default: ollama)
+  --model MODEL                 Model name override
+  --era {western,japanese}      Date format: 2024年3月 vs 令和6年3月 (default: western)
+  --no-cache                    Ignore all cached output and regenerate
+  --strict                      Treat validation warnings as errors
+  --dry-run                     Parse + normalize only, print both and exit
+  -v, --verbose                 Show AI prompts/responses
 ```
 
 ## AI Providers
@@ -72,12 +75,14 @@ Options:
 
 ## Workflow
 
-1. **Parse** - markdown resume is parsed into structured data
-2. **Config** - Japan-specific fields are loaded from YAML or prompted interactively (saved for reuse)
-3. **AI** - content is translated and adapted to Japanese resume conventions (cached to JSON)
-4. **Render** - output generated as markdown and/or PDF
+1. **Parse** - markdown resume is parsed into structured data (`WesternResume`)
+2. **Config** - Japan-specific fields loaded from YAML or prompted interactively (saved for reuse)
+3. **Normalize** - LLM structures ambiguous dates into year/month, classifies bullets as achievements vs responsibilities, groups skills into categories. Falls back to deterministic parsing if LLM fails. Uses config dates as ground truth. Cached to `.normalized_cache.json`.
+4. **Validate** - rule-based checks on the normalized resume: date ranges, overlaps, isCurrent consistency, total experience, low-confidence entries. Warnings printed to console; `--strict` treats them as errors.
+5. **Adapt** - LLM translates and adapts to Japanese conventions, producing `RirekishoData` and `ShokumukeirekishoData`. Cached to `.rirekisho_cache.json` / `.shokumukeirekisho_cache.json`.
+6. **Render** - output generated as markdown and/or PDF
 
-On subsequent runs, steps 2 and 3 are skipped if config and cache files exist.
+All three caches use content-based invalidation (SHA-256 of markdown + config + schema version) — they update automatically when any input changes.
 
 ## Config
 
