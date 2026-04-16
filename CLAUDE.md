@@ -38,6 +38,12 @@ Pipeline: **Parse → Config → AI → Render**
 
 The rirekisho PDF is a grid-form layout drawn with absolute coordinates via `CGContext`, not HTML-to-PDF. Uses `NSFont(name: "HiraginoSans-W3")` for native Japanese font rendering. Supports multi-page overflow when work history is long.
 
+### Tooling
+
+- **SwiftLint** configured in `.swiftlint.yml`. Must pass with 0 violations before committing (`make lint`).
+- **Mint** pins tool versions in `Mintfile` (SwiftLint, XcodeGen). `make bootstrap` installs them.
+- **XcodeGen** generates `JPResume.xcodeproj` from `project.yml` (`make project`).
+
 ### Key Design Decisions
 
 - CodingKeys use `snake_case` for YAML/JSON compatibility with external tools

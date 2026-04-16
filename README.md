@@ -18,8 +18,21 @@ Takes a markdown resume as input, gathers Japan-specific details interactively, 
 
 - macOS 15+
 - Swift 6.2 (Xcode or Swift toolchain)
+- [Mint](https://github.com/yonaskolb/Mint) (optional, for tool management)
 
 ## Build & Run
+
+```bash
+make build                     # swift build
+make test                      # swift test
+make lint                      # swiftlint lint
+make fix                       # swiftlint lint --fix
+make project                   # xcodegen generate
+make install                   # release build + install to /usr/local/bin
+make bootstrap                 # mint bootstrap (install SwiftLint + XcodeGen)
+```
+
+Or directly:
 
 ```bash
 swift build
@@ -79,8 +92,8 @@ Japan-specific data is stored in `jpresume_config.yaml` alongside the input resu
 - Motivation (志望動機), hobbies (趣味・特技), self-PR (自己PR)
 - Commute time, spouse, dependents
 
-## XcodeGen
+## Tooling
 
-```bash
-xcodegen generate   # generates JPResume.xcodeproj from project.yml
-```
+- **Mint** - `Mintfile` pins SwiftLint and XcodeGen versions. Run `make bootstrap` to install.
+- **SwiftLint** - configured in `.swiftlint.yml`. Run `make lint` to check, `make fix` to auto-fix.
+- **XcodeGen** - `project.yml` generates the Xcode project. Run `make project` to regenerate.
