@@ -127,6 +127,50 @@ struct SkillCategory: Codable, Sendable {
     var skills: [String]
 }
 
+// MARK: - DerivedExperience
+
+/// Computed experience metrics derived from the normalized timeline.
+/// Values here override any LLM-generated prose about years of experience.
+struct DerivedExperience: Codable, Sendable {
+    /// Total professional software years (earliest start to latest/current).
+    var totalSoftwareYears: Int
+    /// iOS-focused years (roles with iOS/Swift/mobile in title or bullets).
+    var iosYears: Int?
+    /// Whether any role involved international/cross-border team collaboration.
+    var hasInternationalTeamExperience: Bool
+    /// Years spent in Japan-based roles specifically.
+    var jpWorkYears: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case totalSoftwareYears = "total_software_years"
+        case iosYears = "ios_years"
+        case hasInternationalTeamExperience = "has_international_team_experience"
+        case jpWorkYears = "jp_work_years"
+    }
+
+    init(
+        totalSoftwareYears: Int = 0,
+        iosYears: Int? = nil,
+        hasInternationalTeamExperience: Bool = false,
+        jpWorkYears: Int? = nil
+    ) {
+        self.totalSoftwareYears = totalSoftwareYears
+        self.iosYears = iosYears
+        self.hasInternationalTeamExperience = hasInternationalTeamExperience
+        self.jpWorkYears = jpWorkYears
+    }
+}
+
+// MARK: - RepairNote
+
+/// Records a safe repair applied to normalized data during consistency checking.
+struct RepairNote: Codable, Sendable {
+    var field: String
+    var original: String
+    var repaired: String
+    var reason: String
+}
+
 // MARK: - NormalizedResume
 
 struct NormalizedResume: Codable, Sendable {
@@ -141,12 +185,17 @@ struct NormalizedResume: Codable, Sendable {
     /// Free-text notes from the LLM about ambiguities or assumptions made during normalization.
     var normalizerNotes: [String]
     var rawSections: [String: String]
+    /// Computed experience metrics derived from the timeline. Populated by ResumeConsistencyChecker.
+    var derivedExperience: DerivedExperience?
+    /// Repairs applied during consistency checking.
+    var repairs: [RepairNote]
 
     enum CodingKeys: String, CodingKey {
-        case name, contact, summary, experience, education, certifications, languages
+        case name, contact, summary, experience, education, certifications, languages, repairs
         case skillCategories = "skill_categories"
         case normalizerNotes = "normalizer_notes"
         case rawSections = "raw_sections"
+        case derivedExperience = "derived_experience"
     }
 
     init(
@@ -159,7 +208,9 @@ struct NormalizedResume: Codable, Sendable {
         certifications: [String] = [],
         languages: [String] = [],
         normalizerNotes: [String] = [],
-        rawSections: [String: String] = [:]
+        rawSections: [String: String] = [:],
+        derivedExperience: DerivedExperience? = nil,
+        repairs: [RepairNote] = []
     ) {
         self.name = name
         self.contact = contact
@@ -171,5 +222,7 @@ struct NormalizedResume: Codable, Sendable {
         self.languages = languages
         self.normalizerNotes = normalizerNotes
         self.rawSections = rawSections
+        self.derivedExperience = derivedExperience
+        self.repairs = repairs
     }
 }
