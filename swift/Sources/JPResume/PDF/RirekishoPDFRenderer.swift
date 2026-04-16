@@ -30,12 +30,22 @@ enum RirekishoPDFRenderer {
             throw PDFError.cannotCreate
         }
         ctx.beginPage(mediaBox: &mediaBox)
-        draw(data: data, in: ctx)
+        draw(data: data, in: ctx, mediaBox: &mediaBox)
         ctx.endPage()
         ctx.closePDF()
     }
 
-    private static func draw(data: RirekishoData, in ctx: CGContext) {
+    /// Start a new page and reset y to the top
+    private static func newPageIfNeeded(_ y: inout CGFloat, needed: CGFloat,
+                                        ctx: CGContext, mediaBox: inout CGRect) {
+        if y - needed < margin {
+            ctx.endPage()
+            ctx.beginPage(mediaBox: &mediaBox)
+            y = pageH - margin
+        }
+    }
+
+    private static func draw(data: RirekishoData, in ctx: CGContext, mediaBox: inout CGRect) {
         let x0 = margin
         var y = pageH - margin // Start from top
 
@@ -151,6 +161,9 @@ enum RirekishoPDFRenderer {
         let rowFont = PDFFont.japanese(size: 6)
 
         for i in 0..<numRows {
+            // Page break if needed (leave room for at least the row)
+            newPageIfNeeded(&y, needed: rowH + margin, ctx: ctx, mediaBox: &mediaBox)
+
             drawThreeCols(ctx: ctx, x: x0, y: y, h: rowH)
             if i < entries.count {
                 let (yr, mo, desc) = entries[i]
@@ -175,6 +188,9 @@ enum RirekishoPDFRenderer {
 
         // ===== LICENSES =====
         let licHdrH: CGFloat = 17.01
+        // Ensure licenses + bottom section fit, otherwise new page
+        let licensesNeeded = licHdrH + colH + 3 * rowH + 170
+        newPageIfNeeded(&y, needed: licensesNeeded, ctx: ctx, mediaBox: &mediaBox)
         drawFilledBox(ctx: ctx, x: x0, y: y, w: contentW, h: licHdrH)
         drawTextCentered("免許・資格", at: CGPoint(x: x0 + contentW / 2, y: y - licHdrH / 2 - 2.5),
                          font: PDFFont.japaneseBold(size: 8), in: ctx)
