@@ -82,7 +82,7 @@ enum SystemPrompts {
     static func rirekisho(eraStyle: String, eraExample: String) -> String {
         """
         You are an expert in Japanese resume (履歴書) formatting. You will receive:
-        1. A parsed western-style resume (JSON)
+        1. A normalized resume (JSON) with structured dates and derived experience metrics
         2. Japan-specific configuration data (JSON)
 
         Your task is to produce a complete 履歴書 data structure in JSON format.
@@ -90,6 +90,9 @@ enum SystemPrompts {
         Rules:
         - NEVER fabricate or guess dates, company details, or any factual information. \
         Only use data explicitly provided in the input. If a date is missing, omit that entry or use "年月不明".
+        - NEVER generate years-of-experience text (e.g., "X年以上"). If the input includes \
+        derived_experience.total_software_years or derived_experience.ios_years, use those exact numbers. \
+        If not provided, omit experience-year claims entirely.
         - Convert all provided dates to \(eraStyle) format (e.g., \(eraExample))
         - Education entries should follow Japanese convention:
           - Entry: "〇〇大学 〇〇学部 入学" / Graduation: "〇〇大学 〇〇学部 卒業"
@@ -98,6 +101,7 @@ enum SystemPrompts {
           - Entry: "株式会社〇〇 入社" / Departure: "一身上の都合により退職"
           - Current position: "株式会社〇〇 入社" with "現在に至る" as the final entry
           - Use work dates from japan_config.work_japanese if provided, otherwise from the western resume
+        - Keep the 履歴書 tone conservative and factual — no promotional language
         - If 志望動機 (motivation) is not provided, generate an appropriate one based on the person's background
         - If 趣味・特技 (hobbies) is not provided, suggest appropriate ones based on the resume
         - All text output must be in Japanese
@@ -127,23 +131,51 @@ enum SystemPrompts {
         """
     }
 
-    static func shokumukeirekisho(eraStyle: String) -> String {
-        """
+    static func shokumukeirekisho(eraStyle: String, options: GenerationOptions) -> String {
+        var sideProjectRule = ""
+        if !options.includeSideProjects {
+            sideProjectRule = """
+            - EXCLUDE personal projects, side projects, and hobby projects from work_details. \
+            Only include professional employment roles.
+            """
+        }
+
+        var olderRolesRule = ""
+        if !options.includeOlderIrrelevantRoles {
+            olderRolesRule = """
+            - For roles older than 15 years, compress into a brief mention unless they are highly \
+            relevant to the target position. Group older roles under a single entry if appropriate.
+            """
+        }
+
+        return """
         You are an expert in Japanese career history documents (職務経歴書). You will receive:
-        1. A parsed western-style resume (JSON)
+        1. A normalized resume (JSON) with structured dates and derived experience metrics
         2. Japan-specific configuration data (JSON)
 
         Your task is to produce a complete 職務経歴書 data structure in JSON format.
 
         Rules:
         - NEVER fabricate or guess dates, company details, or any factual information. Only use data explicitly provided in the input.
-        - Write a concise 職務要約 (career summary) of 3-4 sentences in formal Japanese
+        - NEVER generate years-of-experience text (e.g., "X年以上") based on your own calculation. \
+        If the input includes derived_experience.total_software_years, use that exact number. \
+        If derived_experience.ios_years is present, use it for iOS-specific claims. \
+        If not provided, omit experience-year claims entirely.
+        - Write a concise 職務要約 (career summary) of 3-4 sentences in formal Japanese:
+          - Focus on impact and career trajectory
+          - Distinguish between total software development experience and iOS-specific experience \
+        when derived_experience provides both
+          - Make the tone impact-oriented and forward-looking
         - For each work experience, create a detailed entry in formal Japanese business language:
           - Translate and expand bullet points into natural Japanese descriptions
           - Include role, department, responsibilities, and achievements
           - Use work dates from japan_config.work_japanese if provided, otherwise from the western resume
         - Categorize technical skills into groups (言語, フレームワーク, インフラ, データベース, ツール, etc.)
-        - If 自己PR is not provided, generate one highlighting the person's key strengths
+        - If 自己PR is not provided, generate one highlighting the person's key strengths:
+          - The opening sentence of 自己PR MUST be different from the opening sentence of 職務要約
+          - Focus 自己PR on soft skills, leadership, and growth potential
+          - Focus 職務要約 on technical track record and career arc
+        \(sideProjectRule)\(olderRolesRule)\
         - All dates should be in \(eraStyle) format
         - All text output must be in Japanese
 

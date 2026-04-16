@@ -29,11 +29,12 @@ struct ResumeAI: Sendable {
     func generateShokumukeirekisho(
         normalized: NormalizedResume,
         config: JapanConfig,
-        era: EraStyle
+        era: EraStyle,
+        options: GenerationOptions = GenerationOptions()
     ) async throws -> ShokumukeirekishoData {
         let eraStyle = era == .japanese ? "Japanese era (令和/平成)" : "western year"
 
-        let system = SystemPrompts.shokumukeirekisho(eraStyle: eraStyle)
+        let system = SystemPrompts.shokumukeirekisho(eraStyle: eraStyle, options: options)
         let user = try buildUserMessage(normalized: normalized, config: config)
 
         let response = try await call(system: system, user: user)
