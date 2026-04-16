@@ -83,14 +83,18 @@ enum ShokumukeirekishoPDFRenderer {
                 y -= 14
             }
 
+            let bulletMaxW = contentW - 14
+
             if !company.responsibilities.isEmpty {
                 drawText("業務内容:", at: CGPoint(x: margin + 8, y: y - 8),
                          font: PDFFont.japaneseBold(size: 8), in: ctx)
                 y -= 14
                 for item in company.responsibilities {
-                    newPageIfNeeded(needed: 14)
-                    drawText("・\(item)", at: CGPoint(x: margin + 14, y: y - 8), font: detailFont, in: ctx)
-                    y -= 12
+                    let bulletH = measureParagraphHeight(item, maxWidth: bulletMaxW - 14, font: detailFont) + 4
+                    newPageIfNeeded(needed: bulletH)
+                    let consumed = drawBullet(item, x: margin + 14, y: y - 8,
+                                              maxWidth: bulletMaxW, font: detailFont, in: ctx)
+                    y -= consumed
                 }
             }
 
@@ -100,9 +104,11 @@ enum ShokumukeirekishoPDFRenderer {
                          font: PDFFont.japaneseBold(size: 8), in: ctx)
                 y -= 14
                 for item in company.achievements {
-                    newPageIfNeeded(needed: 14)
-                    drawText("・\(item)", at: CGPoint(x: margin + 14, y: y - 8), font: detailFont, in: ctx)
-                    y -= 12
+                    let bulletH = measureParagraphHeight(item, maxWidth: bulletMaxW - 14, font: detailFont) + 4
+                    newPageIfNeeded(needed: bulletH)
+                    let consumed = drawBullet(item, x: margin + 14, y: y - 8,
+                                              maxWidth: bulletMaxW, font: detailFont, in: ctx)
+                    y -= consumed
                 }
             }
 
@@ -173,6 +179,44 @@ enum ShokumukeirekishoPDFRenderer {
         ctx.addLine(to: CGPoint(x: x + w, y: y))
         ctx.strokePath()
         ctx.setStrokeColor(CGColor.black)
+    }
+
+    private static func measureParagraphHeight(_ text: String, maxWidth: CGFloat, font: NSFont) -> CGFloat {
+        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black]
+        let attrStr = NSAttributedString(string: text, attributes: attrs)
+        let framesetter = CTFramesetterCreateWithAttributedString(attrStr)
+        let size = CTFramesetterSuggestFrameSizeWithConstraints(
+            framesetter, CFRange(location: 0, length: 0), nil,
+            CGSize(width: maxWidth, height: .greatestFiniteMagnitude), nil
+        )
+        return size.height
+    }
+
+    /// Draw a bullet point with wrapping text and hanging indent.
+    /// Returns the total height consumed.
+    private static func drawBullet(_ text: String, x: CGFloat, y: CGFloat,
+                                   maxWidth: CGFloat, font: NSFont,
+                                   in ctx: CGContext) -> CGFloat {
+        let bullet = "・"
+        let bulletWidth = measureText(bullet, font: font) + 2
+        let textW = maxWidth - bulletWidth
+
+        // Measure height needed
+        let textH = measureParagraphHeight(text, maxWidth: textW, font: font)
+
+        // Draw bullet at top of first line
+        drawText(bullet, at: CGPoint(x: x, y: y), font: font, in: ctx)
+
+        // Draw wrapped text
+        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black]
+        let attrStr = NSAttributedString(string: text, attributes: attrs)
+        let framesetter = CTFramesetterCreateWithAttributedString(attrStr)
+        let path = CGMutablePath()
+        path.addRect(CGRect(x: x + bulletWidth, y: y - textH + font.pointSize * 0.3, width: textW, height: textH))
+        let frame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), path, nil)
+        CTFrameDraw(frame, ctx)
+
+        return textH + 2
     }
 
     @discardableResult
