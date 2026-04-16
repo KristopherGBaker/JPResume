@@ -218,17 +218,26 @@ enum RirekishoPDFRenderer {
 
         // ===== BOTTOM SECTION =====
         // Motivation
-        let motH: CGFloat = 62.36 // 22mm
-        drawBox(ctx: ctx, x: x0, y: y, w: contentW, h: motH)
         let motLblH: CGFloat = 14.17 // 5mm
+        let motFont = PDFFont.japanese(size: 7)
+        let motTextW = contentW - 11.34
+        let motTextH: CGFloat
+        if let motivation = data.motivation {
+            motTextH = measureWrappedText(motivation, maxWidth: motTextW, font: motFont) + 8
+        } else {
+            motTextH = 28.35 // minimum empty space
+        }
+        let motH = motLblH + motTextH + 4 // label + text + padding
+
+        newPageIfNeeded(&y, needed: motH, ctx: ctx, mediaBox: &mediaBox)
+        drawBox(ctx: ctx, x: x0, y: y, w: contentW, h: motH)
         drawFilledBox(ctx: ctx, x: x0, y: y, w: contentW, h: motLblH)
         drawText("志望の動機、特技、好きな学科、アピールポイントなど",
                  at: CGPoint(x: x0 + 5.67, y: y - motLblH + 4),
                  font: PDFFont.japanese(size: 6), in: ctx)
         if let motivation = data.motivation {
-            drawWrappedText(motivation, at: CGPoint(x: x0 + 5.67, y: y - motLblH - 11),
-                            maxWidth: contentW - 11.34, font: PDFFont.japanese(size: 7),
-                            lineHeight: 11, in: ctx)
+            drawWrappedText(motivation, at: CGPoint(x: x0 + 5.67, y: y - motLblH - 2),
+                            maxWidth: motTextW, height: motTextH, font: motFont, in: ctx)
         }
         y -= motH
 
@@ -338,9 +347,20 @@ enum RirekishoPDFRenderer {
         CTLineDraw(line, ctx)
     }
 
+    private static func measureWrappedText(_ text: String, maxWidth: CGFloat, font: NSFont) -> CGFloat {
+        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black]
+        let attrStr = NSAttributedString(string: text, attributes: attrs)
+        let framesetter = CTFramesetterCreateWithAttributedString(attrStr)
+        let size = CTFramesetterSuggestFrameSizeWithConstraints(
+            framesetter, CFRange(location: 0, length: 0), nil,
+            CGSize(width: maxWidth, height: CGFloat.greatestFiniteMagnitude), nil
+        )
+        return size.height
+    }
+
     private static func drawWrappedText(_ text: String, at point: CGPoint,
-                                        maxWidth: CGFloat, font: NSFont,
-                                        lineHeight: CGFloat, in ctx: CGContext) {
+                                        maxWidth: CGFloat, height: CGFloat,
+                                        font: NSFont, in ctx: CGContext) {
         let attrs: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: NSColor.black,
@@ -348,7 +368,7 @@ enum RirekishoPDFRenderer {
         let attrStr = NSAttributedString(string: text, attributes: attrs)
         let framesetter = CTFramesetterCreateWithAttributedString(attrStr)
         let path = CGMutablePath()
-        let frameRect = CGRect(x: point.x, y: point.y - 100, width: maxWidth, height: 100)
+        let frameRect = CGRect(x: point.x, y: point.y - height, width: maxWidth, height: height)
         path.addRect(frameRect)
         let frame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), path, nil)
         CTFrameDraw(frame, ctx)
