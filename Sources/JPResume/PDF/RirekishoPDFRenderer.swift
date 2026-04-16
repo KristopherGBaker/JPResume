@@ -45,6 +45,7 @@ enum RirekishoPDFRenderer {
         }
     }
 
+    // swiftlint:disable:next function_body_length
     private static func draw(data: RirekishoData, in ctx: CGContext, mediaBox: inout CGRect) {
         let x0 = margin
         var y = pageH - margin // Start from top
@@ -298,6 +299,7 @@ enum RirekishoPDFRenderer {
         drawBox(ctx: ctx, x: x + yearW + monthW, y: y, w: descW, h: h)
     }
 
+    // swiftlint:disable:next function_parameter_count
     private static func drawLabelRow(ctx: CGContext, x: CGFloat, y: CGFloat,
                                      w: CGFloat, h: CGFloat,
                                      labelW: CGFloat, label: String, value: String,

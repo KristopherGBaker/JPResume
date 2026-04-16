@@ -8,6 +8,7 @@ enum ShokumukeirekishoPDFRenderer {
     private static let pageH: CGFloat = 841.89
     private static let margin: CGFloat = 28.35
 
+    // swiftlint:disable:next function_body_length
     static func render(data: ShokumukeirekishoData, to url: URL) throws {
         var mediaBox = CGRect(x: 0, y: 0, width: pageW, height: pageH)
         guard let ctx = CGContext(url as CFURL, mediaBox: &mediaBox, nil) else {

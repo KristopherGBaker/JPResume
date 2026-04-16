@@ -4,6 +4,7 @@ enum InteractivePrompter {
 
     // MARK: - Main Flow
 
+    // swiftlint:disable:next function_body_length
     static func promptAll(western: WesternResume) -> JapanConfig {
         var config = JapanConfig()
 
