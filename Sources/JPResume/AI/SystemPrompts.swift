@@ -10,7 +10,8 @@ enum SystemPrompts {
         Your task is to produce a complete 履歴書 data structure in JSON format.
 
         Rules:
-        - NEVER fabricate or guess dates, company details, or any factual information. Only use data explicitly provided in the input. If a date is missing, omit that entry or use the placeholder "年月不明" and flag it.
+        - NEVER fabricate or guess dates, company details, or any factual information. \
+        Only use data explicitly provided in the input. If a date is missing, omit that entry or use "年月不明".
         - Convert all provided dates to \(eraStyle) format (e.g., \(eraExample))
         - Education entries should follow Japanese convention:
           - Entry: "〇〇大学 〇〇学部 入学" / Graduation: "〇〇大学 〇〇学部 卒業"

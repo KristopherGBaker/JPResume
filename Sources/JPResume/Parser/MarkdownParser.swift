@@ -414,6 +414,7 @@ private struct RegexWrapper {
 }
 
 private func regex(_ pattern: String, options: NSRegularExpression.Options = []) -> RegexWrapper {
+    // swiftlint:disable:next force_try
     RegexWrapper(nsRegex: try! NSRegularExpression(pattern: pattern, options: options))
 }
 

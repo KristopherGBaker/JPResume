@@ -9,12 +9,16 @@ JPResume is a Swift CLI tool that converts western-style markdown resumes to Jap
 ## Build & Test Commands
 
 ```bash
-swift build                    # build
-swift test                     # run all tests (15 tests, 3 suites)
+make build                     # swift build
+make test                      # swift test (15 tests, 3 suites)
+make lint                      # swiftlint lint
+make fix                       # swiftlint lint --fix
+make project                   # xcodegen generate
+make install                   # build release + copy to /usr/local/bin
+make bootstrap                 # mint bootstrap (install tools from Mintfile)
 swift run jpresume --help      # run CLI
 swift run jpresume convert examples/resume.md --dry-run  # parse only
 swift run jpresume convert examples/Kristopher_Baker_Resume.md --provider claude-cli --format both
-xcodegen generate              # regenerate Xcode project from project.yml
 ```
 
 ## Architecture
