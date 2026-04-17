@@ -4,15 +4,19 @@ Convert western-style resumes to Japanese format: 履歴書 (rirekisho) and 職�
 
 ## Install
 
+Homebrew (recommended):
 ```bash
-# Homebrew (recommended)
 brew tap KristopherGBaker/tap && brew install jpresume
+```
 
-# curl
+curl:
+```bash
 curl -L https://github.com/KristopherGBaker/JPResume/releases/latest/download/jpresume \
   -o /usr/local/bin/jpresume && chmod +x /usr/local/bin/jpresume
+```
 
-# mise
+mise:
+```bash
 mise use -g ubi:KristopherGBaker/JPResume
 ```
 
