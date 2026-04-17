@@ -20,9 +20,27 @@ Takes a markdown resume as input, gathers Japan-specific details interactively, 
 
 - macOS 15+
 - Swift 6.2 (Xcode or Swift toolchain)
-- [Mint](https://github.com/yonaskolb/Mint) (optional, for tool management)
+- [Mint](https://github.com/yonaskolb/Mint) (for `mint install`, and for managing the repo's lint/codegen tools)
 
-## Build & Run
+## Install
+
+Install `jpresume` via [Mint](https://github.com/yonaskolb/Mint):
+
+```bash
+mint install KristopherGBaker/JPResume
+```
+
+Mint builds the release binary and drops it on your `PATH` at `~/.mint/bin/jpresume`.
+
+Or build from source:
+
+```bash
+git clone https://github.com/KristopherGBaker/JPResume.git
+cd JPResume
+make install   # release build → /usr/local/bin/jpresume
+```
+
+## Build & Run (contributors)
 
 ```bash
 make build                     # swift build
@@ -162,6 +180,18 @@ On parse failure, `--ingest` writes `<stage>.error.json` with the decoder error 
 ### Editing artifacts by hand
 
 `normalized.json`, `rirekisho.json`, and `shokumukeirekisho.json` carry `role: source` — hand-edits survive until an upstream stage invalidates them. `repaired.json` and `validation.json` are `role: derived`; edits there are discarded the next time `repair` or `validate` runs. `inspect <artifact>` prints a banner for derived artifacts.
+
+## Agent skill
+
+The repo ships an [Agent Skill](https://skills.sh) at [`skills/japanese-resume/`](skills/japanese-resume/SKILL.md) that drives the stepwise pipeline in `--external` mode. The agent produces the JSON for the LLM stages (`normalize`, `generate rirekisho`, `generate shokumukeirekisho`) and pauses after `validate` so you can review warnings and hand-edit artifacts before generating output.
+
+Install into your agent via the [skills](https://www.npmjs.com/package/skills) CLI:
+
+```bash
+npx skills add KristopherGBaker/JPResume
+```
+
+Works with Claude Code, Cursor, Codex, and other supported agents. See the [skill's SKILL.md](skills/japanese-resume/SKILL.md) for the full contract.
 
 ## Config
 
