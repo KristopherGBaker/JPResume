@@ -54,12 +54,22 @@ struct NormalizedWorkEntry: Codable, Sendable {
     var bullets: [NormalizedBullet]
     /// 0.0–1.0 confidence in date parsing and bullet classification. Omitted when unambiguous.
     var confidence: Double?
+    /// True if this entry is a personal/side/hobby project rather than salaried employment.
+    var isSideProject: Bool?
+    /// True if this entry is a salaried professional role. Usually the inverse of isSideProject.
+    var isProfessionalRole: Bool?
+    /// Short specialization tags (e.g. "ios", "backend", "leadership"). Used by downstream prompts
+    /// to decide how to frame the role.
+    var specializationTags: [String]?
 
     enum CodingKeys: String, CodingKey {
         case company, title, location, bullets, confidence
         case startDate = "start_date"
         case endDate = "end_date"
         case isCurrent = "is_current"
+        case isSideProject = "is_side_project"
+        case isProfessionalRole = "is_professional_role"
+        case specializationTags = "specialization_tags"
     }
 
     init(
@@ -70,7 +80,10 @@ struct NormalizedWorkEntry: Codable, Sendable {
         isCurrent: Bool = false,
         location: String? = nil,
         bullets: [NormalizedBullet] = [],
-        confidence: Double? = nil
+        confidence: Double? = nil,
+        isSideProject: Bool? = nil,
+        isProfessionalRole: Bool? = nil,
+        specializationTags: [String]? = nil
     ) {
         self.company = company
         self.title = title
@@ -80,6 +93,9 @@ struct NormalizedWorkEntry: Codable, Sendable {
         self.location = location
         self.bullets = bullets
         self.confidence = confidence
+        self.isSideProject = isSideProject
+        self.isProfessionalRole = isProfessionalRole
+        self.specializationTags = specializationTags
     }
 }
 
@@ -186,7 +202,12 @@ struct NormalizedResume: Codable, Sendable {
     var normalizerNotes: [String]
     var rawSections: [String: String]
     /// Computed experience metrics derived from the timeline. Populated by ResumeConsistencyChecker.
+    /// The LLM may also emit an initial estimate in the normalization response; the checker
+    /// recomputes these deterministically — chronology wins over any prose claims.
     var derivedExperience: DerivedExperience?
+    /// LLM-flagged timeline concerns (overlaps, suspicious gaps, prose/chronology conflicts).
+    /// Preserved through the pipeline so downstream prompts can see what was surprising.
+    var timelineWarnings: [String]?
     /// Repairs applied during consistency checking.
     var repairs: [RepairNote]
 
@@ -196,6 +217,7 @@ struct NormalizedResume: Codable, Sendable {
         case normalizerNotes = "normalizer_notes"
         case rawSections = "raw_sections"
         case derivedExperience = "derived_experience"
+        case timelineWarnings = "timeline_warnings"
     }
 
     init(
@@ -210,6 +232,7 @@ struct NormalizedResume: Codable, Sendable {
         normalizerNotes: [String] = [],
         rawSections: [String: String] = [:],
         derivedExperience: DerivedExperience? = nil,
+        timelineWarnings: [String]? = nil,
         repairs: [RepairNote] = []
     ) {
         self.name = name
@@ -223,6 +246,7 @@ struct NormalizedResume: Codable, Sendable {
         self.normalizerNotes = normalizerNotes
         self.rawSections = rawSections
         self.derivedExperience = derivedExperience
+        self.timelineWarnings = timelineWarnings
         self.repairs = repairs
     }
 }
