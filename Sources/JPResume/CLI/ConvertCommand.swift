@@ -214,6 +214,7 @@ extension ConvertCommand {
         return result
     }
 
+    // swiftlint:disable:next function_parameter_count
     private func resolveJPData(
         store: ArtifactStore,
         repaired: NormalizedResume,

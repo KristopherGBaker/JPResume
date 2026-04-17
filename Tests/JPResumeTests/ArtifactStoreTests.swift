@@ -205,6 +205,42 @@ struct ArtifactStoreTests {
         #expect(inputs == nil)
     }
 
+    // MARK: - ArtifactHashes target context invalidation
+
+    @Test func rirekishoHashChangesWithTargetContext() {
+        let base = ArtifactHashes.rirekisho(inputsHash: "h", era: .western)
+        let ctx = TargetCompanyContext(companyName: "Acme", roleTitle: "iOS Dev")
+        let targeted = ArtifactHashes.rirekisho(inputsHash: "h", era: .western, targetContext: ctx)
+        #expect(base != targeted)
+    }
+
+    @Test func rirekishoHashStableWithSameTargetContext() {
+        let ctx = TargetCompanyContext(companyName: "Acme", roleTitle: "iOS Dev")
+        let hash1 = ArtifactHashes.rirekisho(inputsHash: "h", era: .western, targetContext: ctx)
+        let hash2 = ArtifactHashes.rirekisho(inputsHash: "h", era: .western, targetContext: ctx)
+        #expect(hash1 == hash2)
+    }
+
+    @Test func shokumukeirekishoHashChangesWithTargetContext() {
+        let opts = GenerationOptions()
+        let base = ArtifactHashes.shokumukeirekisho(inputsHash: "h", era: .western, options: opts)
+        let ctx = TargetCompanyContext(emphasisTags: ["consumer", "mobile"])
+        let targeted = ArtifactHashes.shokumukeirekisho(inputsHash: "h", era: .western, options: opts,
+                                                         targetContext: ctx)
+        #expect(base != targeted)
+    }
+
+    @Test func differentTargetContextsProduceDifferentHashes() {
+        let opts = GenerationOptions()
+        let ctx1 = TargetCompanyContext(companyName: "Acme")
+        let ctx2 = TargetCompanyContext(companyName: "Globex")
+        let h1 = ArtifactHashes.shokumukeirekisho(inputsHash: "h", era: .western, options: opts,
+                                                   targetContext: ctx1)
+        let h2 = ArtifactHashes.shokumukeirekisho(inputsHash: "h", era: .western, options: opts,
+                                                   targetContext: ctx2)
+        #expect(h1 != h2)
+    }
+
     // MARK: - List
 
     @Test func listReportsAllKinds() throws {

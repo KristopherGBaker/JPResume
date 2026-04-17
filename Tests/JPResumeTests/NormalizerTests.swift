@@ -89,6 +89,72 @@ struct NormalizerModelTests {
         #expect(decoded.normalizerNotes.count == 1)
     }
 
+    // MARK: NormalizedResume backward-compatible decoding
+
+    @Test func normalizedResumeDecodesWithoutRepairsField() throws {
+        // Pre-repairs JSON (from before the repairs field was added) must decode to repairs: []
+        let json = """
+        {
+          "name": "Old Format",
+          "contact": {},
+          "experience": [],
+          "education": [],
+          "skill_categories": [],
+          "certifications": [],
+          "languages": [],
+          "normalizer_notes": [],
+          "raw_sections": {}
+        }
+        """
+        let data = Data(json.utf8)
+        let resume = try JSONDecoder().decode(NormalizedResume.self, from: data)
+        #expect(resume.name == "Old Format")
+        #expect(resume.repairs.isEmpty)
+    }
+
+    // MARK: TargetCompanyContext
+
+    @Test func targetCompanyContextRoundTrip() throws {
+        let ctx = TargetCompanyContext(
+            companyName: "株式会社テスト",
+            roleTitle: "iOSエンジニア",
+            companySummary: "A great company",
+            jobDescriptionExcerpt: "Build iOS apps",
+            normalizedRequirements: ["Swift", "SwiftUI"],
+            emphasisTags: ["mobile", "consumer"],
+            candidateInterestNotes: "I love this company"
+        )
+        let data = try JSONEncoder().encode(ctx)
+        let decoded = try JSONDecoder().decode(TargetCompanyContext.self, from: data)
+        #expect(decoded.companyName == "株式会社テスト")
+        #expect(decoded.roleTitle == "iOSエンジニア")
+        #expect(decoded.emphasisTags == ["mobile", "consumer"])
+        #expect(decoded.normalizedRequirements == ["Swift", "SwiftUI"])
+    }
+
+    @Test func targetCompanyContextDecodesPartialFields() throws {
+        // All fields are optional — only company_name present
+        let json = #"{"company_name": "Partial Co"}"#
+        let ctx = try JSONDecoder().decode(TargetCompanyContext.self, from: Data(json.utf8))
+        #expect(ctx.companyName == "Partial Co")
+        #expect(ctx.roleTitle == nil)
+        #expect(ctx.emphasisTags == nil)
+    }
+
+    @Test func targetCompanyContextUsesSnakeCaseKeys() throws {
+        let ctx = TargetCompanyContext(
+            companyName: "Co",
+            roleTitle: "Engineer",
+            emphasisTags: ["mobile"]
+        )
+        let data = try JSONEncoder().encode(ctx)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        #expect(json?["company_name"] != nil)
+        #expect(json?["role_title"] != nil)
+        #expect(json?["emphasis_tags"] != nil)
+        #expect(json?["companyName"] == nil)
+    }
+
     // MARK: Snake_case CodingKeys
 
     @Test func normalizedWorkEntryUsesSnakeCaseKeys() throws {
