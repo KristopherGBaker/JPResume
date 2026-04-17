@@ -32,7 +32,7 @@ jobs:
           chmod +x jpresume
 
       - name: Compute checksum
-        run: shasum -a 256 jpresume > jpresume.sha256
+        run: shasum -a 256 jpresume | tee jpresume.sha256
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -41,3 +41,21 @@ jobs:
             jpresume
             jpresume.sha256
           generate_release_notes: true
+
+      - name: Bump Homebrew tap
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          SHA256=$(shasum -a 256 jpresume | awk '{print $1}')
+
+          gh repo clone KristopherGBaker/homebrew-tap tap-repo
+          cd tap-repo
+
+          sed -i '' "s/version \".*\"/version \"${VERSION}\"/" Formula/jpresume.rb
+          sed -i '' "s/sha256 \".*\"/sha256 \"${SHA256}\"/" Formula/jpresume.rb
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: bump jpresume to ${VERSION}"
+          git push
