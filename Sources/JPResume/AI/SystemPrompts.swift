@@ -140,7 +140,8 @@ enum SystemPrompts {
           },
           "timeline_warnings": ["string", ...],
           "normalizer_notes": ["string", ...],
-          "raw_sections": {}
+          "raw_sections": {},
+          "repairs": []
         }
         """
     }
@@ -207,9 +208,25 @@ enum SystemPrompts {
 
         Work entries (oldest first):
         - "株式会社〇〇 入社" / "一身上の都合により退職"
-        - For the current role: "株式会社〇〇 入社" and end the list with "現在に至る".
+        - For a current role: include the company entry with its actual start year/month.
+          Then append a final continuation row whose date cell is BLANK ("") and whose
+          description is「現在に至る」. Never output「現在」in the date column.
         - Include only professional employment roles in work_history. Exclude entries flagged
           is_side_project=true. Personal projects and open-source work do not belong in 履歴書.
+
+        # 免許・資格 (licenses and certifications)
+
+        For licenses and certifications, prefer standard Japanese naming when a widely used
+        Japanese expression exists. Keep naming consistent across all rows.
+        Example: output「日本語能力試験N3 合格」rather than an English JLPT label.
+
+        # Naming consistency
+
+        For schools and employers:
+        - Use Japanese legal/entity names when they are commonly used in Japan.
+        - Otherwise preserve the original official English name.
+        - Once chosen, keep the naming consistent across education_history, work_history,
+          and all other sections of the same output.
 
         # 志望動機 (motivation)
 
@@ -333,7 +350,11 @@ enum SystemPrompts {
         - Only use derived_experience.total_software_years and derived_experience.ios_years
           when making year-count statements. Quote those values exactly.
         - If a needed derived value is absent, OMIT the year-count claim. Rephrase to avoid a
-          number entirely (e.g., use "iOSアプリ開発を専門としてまいりました" instead of a year count).
+          number entirely (e.g., use「iOSアプリ開発を専門としてまいりました」instead of a year count).
+        - Even when derived_experience values are available, prefer omitting exact year counts
+          in prose unless the number materially strengthens the document. If you use a count,
+          prefer a rounded and natural phrasing such as「10年以上」over a brittle exact number
+          when appropriate.
 
         # Natural Japanese over literal translation
 
@@ -360,6 +381,21 @@ enum SystemPrompts {
           verb-translations.
         - Replace カタカナ-heavy strings with established kanji/mixed equivalents when available.
         - Keep technical product names in their original form (Swift, iOS, Firebase, etc.).
+        - Do not over-translate common product vocabulary into HR or training terminology.
+          Product onboarding should remain「オンボーディング」unless the source clearly refers
+          to employee training or internal enablement.
+        - When rewriting quantified product outcomes, prefer natural Japanese business phrasing
+          over literal metric translation. Examples:
+          「+29.8% incremental membership sign-ups」→「新規会員登録数の29.8%増加に寄与」
+          「27,000 additional annual subscribers」→「年間27,000件規模の追加会員登録につながる改善を実施」
+
+        # Naming consistency
+
+        For schools and employers:
+        - Use Japanese legal/entity names when they are commonly used in Japan.
+        - Otherwise preserve the original official English name.
+        - Once chosen, keep the naming consistent across 職務要約, 自己PR, and all
+          work_details entries.
 
         # Structure: 職務要約 vs 自己PR (they must be distinct)
 
@@ -405,9 +441,19 @@ enum SystemPrompts {
 
         # Technical skills
 
-        - Categorize into 言語 / フレームワーク / インフラ / データベース / ツール / その他
-          (add categories only when clearly needed).
-        - Use skill_categories from the normalized resume as the primary source.
+        Use the following skill categories by default unless the input strongly requires
+        another structure:
+        - 言語
+        - フレームワーク
+        - 設計・開発
+        - 品質・改善
+        - AI関連
+        - その他
+
+        Do not mix architecture, practices, and domain expertise into a generic「インフラ」
+        or「ツール」bucket unless that is clearly the best fit.
+        Use skill_categories from the normalized resume as the primary source; remap into
+        the above taxonomy as needed.
 
         # Output
 
