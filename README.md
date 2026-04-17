@@ -47,7 +47,14 @@ The CLI can also be used standalone for one-shot or batch generation — see [Us
 
 ## Install
 
-### Pre-built universal binary (recommended)
+### Homebrew
+
+```bash
+brew tap KristopherGBaker/tap
+brew install jpresume
+```
+
+### Pre-built universal binary
 
 Download the latest release binary directly — no Swift toolchain required:
 
