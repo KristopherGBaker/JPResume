@@ -43,20 +43,45 @@ The CLI can also be used standalone for one-shot or batch generation — see [Us
 ## Requirements
 
 - macOS 15+
-- Swift 6.2 (Xcode or Swift toolchain)
-- [Mint](https://github.com/yonaskolb/Mint) (for `mint install`, and for managing the repo's lint/codegen tools)
+- Swift 6.2 only required if building from source or using Mint
 
 ## Install
 
-Install `jpresume` via [Mint](https://github.com/yonaskolb/Mint):
+### Pre-built universal binary (recommended)
+
+Download the latest release binary directly — no Swift toolchain required:
+
+```bash
+curl -L https://github.com/KristopherGBaker/JPResume/releases/latest/download/jpresume \
+  -o /usr/local/bin/jpresume && chmod +x /usr/local/bin/jpresume
+```
+
+Or download manually from the [Releases page](https://github.com/KristopherGBaker/JPResume/releases).
+
+### mise
+
+If you use [mise](https://mise.jdx.dev), install via the `ubi` backend:
+
+```bash
+mise use -g ubi:KristopherGBaker/JPResume
+```
+
+Or pin a version in `mise.toml`:
+
+```toml
+[tools]
+"ubi:KristopherGBaker/JPResume" = "0.3.0"
+```
+
+### Mint
+
+Install via [Mint](https://github.com/yonaskolb/Mint) (builds from source — requires Swift 6.2):
 
 ```bash
 mint install KristopherGBaker/JPResume
 ```
 
-Mint builds the release binary and drops it on your `PATH` at `~/.mint/bin/jpresume`.
-
-Or build from source:
+### Build from source
 
 ```bash
 git clone https://github.com/KristopherGBaker/JPResume.git
