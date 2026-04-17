@@ -35,6 +35,11 @@ LLM stages (`normalize`, `generate rirekisho`, `generate shokumukeirekisho`) als
 accept `--external` (write a prompt bundle and exit; caller performs inference) and
 `--ingest` (read the caller's response file and write the artifact).
 
+`generate rirekisho` and `generate shokumukeirekisho` accept `--target <file.json>`
+(`TargetCompanyContext`) to switch from neutral master-document mode to tailored
+application mode (adjusts 志望動機, 職務要約, 自己PR, role/achievement emphasis).
+`convert` also accepts `--target`. Changing the target file invalidates the artifact cache.
+
 ## Architecture
 
 Pipeline: **Parse → Normalize → Validate → Adapt → Render**
@@ -50,6 +55,7 @@ Pipeline: **Parse → Normalize → Validate → Adapt → Render**
 
 - `WesternResume` — raw parsed output from the deterministic parser. Dates are strings, bullets are flat.
 - `NormalizedResume` — canonical intermediate produced by `ResumeNormalizer`. Contains `StructuredDate` (year/month ints), `NormalizedBullet` (with `.responsibility`/`.achievement` classification), `SkillCategory` groups, and per-entry `confidence` scores.
+- `TargetCompanyContext` (`Sources/JPResume/Models/TargetCompanyContext.swift`) — optional tailoring layer. Fields: `company_name`, `role_title`, `company_summary`, `job_description_excerpt`, `normalized_requirements`, `emphasis_tags`, `candidate_interest_notes`. All optional. Loaded from a JSON file via `--target`; folded into `ArtifactHashes` so the cache is invalidated when the file changes.
 
 ### AI Provider Abstraction
 

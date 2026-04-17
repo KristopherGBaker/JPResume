@@ -73,9 +73,10 @@ jpresume normalize --workspace <ws> --ingest
 Output: `normalized.json` — structured dates (year/month ints), bullets classified as `achievement` or `responsibility`, skills grouped into categories, per-entry `confidence`. Use `JapanConfig` dates as ground truth when they disagree with free-text in the markdown.
 
 Read `system` for the full contract. Key rules:
-- Never invent dates. If uncertain, set `confidence: "low"` and leave the free-text hint.
-- Every bullet needs `type: "achievement"` or `type: "responsibility"`.
-- Skill categories: `languages`, `frameworks`, `infrastructure`, `databases`, `tools`, `other`.
+- Never invent dates. If uncertain, set `confidence` below 0.8 on that entry.
+- Every bullet needs `"category": "achievement"` or `"category": "responsibility"` (not `type:`).
+- Skill categories (use these names): `Languages`, `Frameworks`, `Databases`, `Infrastructure`, `Tools`, `Other`.
+- Top-level output must include `"repairs": []` (empty array — repairs are added by the repair stage, not here).
 
 ### 3. Repair (deterministic)
 
@@ -122,6 +123,26 @@ Ask user about `--era` before running:
 - `--era western` (default): `2024年3月`
 - `--era japanese`: `令和6年3月`
 
+Ask whether this is a **targeted application** or a **master document**:
+- **Master (default)**: no extra flags — produces a neutral reusable 履歴書.
+- **Targeted**: `--target <company.json>` — tailors 志望動機 toward a specific employer.
+  Create the target file before running:
+  ```json
+  {
+    "company_name": "株式会社〇〇",
+    "role_title": "iOSエンジニア",
+    "company_summary": "...",
+    "job_description_excerpt": "...",
+    "emphasis_tags": ["mobile", "consumer"]
+  }
+  ```
+  All fields are optional. See `TargetCompanyContext` in the repo for the full schema.
+
+Key rules to follow when producing the rirekisho JSON in external mode:
+- Current role: include the company entry with its actual start year/month. Then add a final continuation row with a **blank** date cell (`""`) and description `「現在に至る」`. Never put `「現在」` in the date column.
+- Licenses/certifications: prefer standard Japanese names when one exists — e.g. `日本語能力試験N3 合格`, not `JLPT N3`.
+- Naming: use Japanese legal entity names when commonly used in Japan; keep the choice consistent across all sections of the output.
+
 ### 6. Generate shokumukeirekisho (LLM — you drive)
 
 ```bash
@@ -134,8 +155,16 @@ Ask user about:
 - `--include-side-projects` — include personal/side projects section
 - `--exclude-older-roles` — trim roles that are no longer relevant (typically 10+ years old, non-technical, or pre-pivot)
 - `--era` — same as rirekisho
+- `--target <company.json>` — tailored application mode (same JSON file as rirekisho; tailors 職務要約, 自己PR, role emphasis, achievement prioritization)
 
-Both flags fold into the content hash, so toggling them correctly re-generates.
+All flags fold into the content hash, so toggling them correctly re-generates.
+
+Key rules to follow when producing the shokumukeirekisho JSON in external mode:
+- **Skill taxonomy** — use these category names: `言語`, `フレームワーク`, `設計・開発`, `品質・改善`, `AI関連`, `その他`. Don't create generic `インフラ` or `ツール` buckets unless clearly the best fit.
+- **Year counts** — prefer omitting exact year counts in prose unless the number materially strengthens the document. When used, prefer rounded phrasing like `10年以上` over a brittle exact count.
+- **Metric phrasing** — rewrite quantified outcomes in natural Japanese business phrasing: `+29.8% incremental sign-ups` → `新規会員登録数の29.8%増加に寄与`.
+- **Product vocabulary** — don't over-translate: product onboarding → `オンボーディング`, not `新人教育・導入支援`.
+- **Naming** — same consistency rule as rirekisho: Japanese legal entity names when common; consistent across all sections.
 
 ### 7. Render + final review
 
@@ -158,6 +187,26 @@ For refinements to Japanese phrasing (e.g., "make 自己PR less formal"), hand-e
 **"Include my GitHub project as a side project"** → re-run `jpresume generate shokumukeirekisho --workspace <ws> --external --include-side-projects`, respond with updated JSON, `--ingest`, `render`.
 
 **"Switch to reiwa dates everywhere"** → re-run both generate stages with `--era japanese`.
+
+**"I'm applying to [Company X] for [role]"** → create a target context JSON file, then re-run both generate stages with `--target`:
+```bash
+# Create target file (any subset of fields is fine)
+cat > target_companyX.json <<'EOF'
+{
+  "company_name": "株式会社〇〇",
+  "role_title": "シニアiOSエンジニア",
+  "company_summary": "消費者向けフィンテックアプリを運営",
+  "emphasis_tags": ["consumer", "mobile", "growth"]
+}
+EOF
+
+jpresume generate rirekisho --workspace <ws> --target target_companyX.json --external
+# respond, ingest
+jpresume generate shokumukeirekisho --workspace <ws> --target target_companyX.json --external
+# respond, ingest
+jpresume render both --workspace <ws>
+```
+Use a separate `--workspace` (e.g. `--workspace .jpresume-companyX`) to keep the targeted artifacts alongside the master set.
 
 **"Completely redo the whole thing"** → `rm -rf <ws>/`, start at stage 1. Or use `--no-cache` on individual stages.
 
