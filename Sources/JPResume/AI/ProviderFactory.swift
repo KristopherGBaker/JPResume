@@ -10,8 +10,13 @@ enum ProviderFactory {
         "codex-cli": "",
     ]
 
+    /// Resolve a model name for a provider, falling back to the default if none is supplied.
+    static func resolveModel(provider: String, model: String?) -> String {
+        model ?? defaultModels[provider] ?? ""
+    }
+
     static func create(provider: String, model: String? = nil) throws -> any AIProvider {
-        let resolvedModel = model ?? defaultModels[provider] ?? ""
+        let resolvedModel = resolveModel(provider: provider, model: model)
 
         switch provider {
         case "anthropic":

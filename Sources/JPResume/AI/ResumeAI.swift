@@ -10,6 +10,11 @@ struct ResumeAI: Sendable {
         print("  Using AI provider: \(self.provider.name)")
     }
 
+    init(provider: any AIProvider, verbose: Bool) {
+        self.provider = provider
+        self.verbose = verbose
+    }
+
     func generateRirekisho(
         normalized: NormalizedResume,
         config: JapanConfig,

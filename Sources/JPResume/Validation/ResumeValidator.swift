@@ -2,20 +2,21 @@ import Foundation
 
 // MARK: - Validation types
 
-enum ValidationSeverity: Sendable {
-    case warning, error
+enum ValidationSeverity: String, Codable, Sendable {
+    case info, warning, error
 }
 
-struct ValidationIssue: Sendable {
+struct ValidationIssue: Codable, Sendable {
     let severity: ValidationSeverity
     let field: String
     let message: String
 }
 
-struct ValidationResult: Sendable {
+struct ValidationResult: Codable, Sendable {
     let issues: [ValidationIssue]
     let totalYearsExperience: Double?
 
+    var infos: [ValidationIssue] { issues.filter { $0.severity == .info } }
     var warnings: [ValidationIssue] { issues.filter { $0.severity == .warning } }
     var errors: [ValidationIssue] { issues.filter { $0.severity == .error } }
     var isValid: Bool { errors.isEmpty }
@@ -24,6 +25,17 @@ struct ValidationResult: Sendable {
     init(issues: [ValidationIssue], totalYearsExperience: Double? = nil) {
         self.issues = issues
         self.totalYearsExperience = totalYearsExperience
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case issues
+        case totalYearsExperience = "total_years_experience"
+    }
+}
+
+extension ValidationIssue {
+    var asArtifactWarning: ArtifactWarning {
+        ArtifactWarning(severity: severity.rawValue, field: field, message: message)
     }
 }
 
@@ -155,6 +167,8 @@ enum ResumeValidator {
         }
         for issue in result.issues {
             switch issue.severity {
+            case .info:
+                print("  ℹ️  \(issue.field): \(issue.message)")
             case .warning:
                 print("  ⚠️  \(issue.field): \(issue.message)")
             case .error:
