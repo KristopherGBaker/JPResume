@@ -10,7 +10,7 @@ JPResume is a Swift CLI tool that converts western-style markdown resumes to Jap
 
 ```bash
 make build                     # swift build
-make test                      # swift test (43 tests, 6 suites)
+make test                      # swift test (133 tests, 12 suites)
 make lint                      # swiftlint lint
 make fix                       # swiftlint lint --fix
 make project                   # xcodegen generate
@@ -20,6 +20,20 @@ swift run jpresume --help      # run CLI
 swift run jpresume convert examples/resume.md --dry-run  # parse + normalize only, prints both
 swift run jpresume convert examples/Kristopher_Baker_Resume.md --provider claude-cli --format both
 ```
+
+## CLI surface
+
+Two orchestration modes share the same underlying pipeline:
+
+- **`convert <input.md>`** — one-shot end-to-end run (unchanged behavior).
+- **Stepwise subcommands** — `parse`, `normalize`, `validate`, `repair`, `generate
+  rirekisho`, `generate shokumukeirekisho`, `render`, `inspect`. Each reads / writes
+  artifacts inside a workspace so humans or agents can pause, review, and resume
+  between stages.
+
+LLM stages (`normalize`, `generate rirekisho`, `generate shokumukeirekisho`) also
+accept `--external` (write a prompt bundle and exit; caller performs inference) and
+`--ingest` (read the caller's response file and write the artifact).
 
 ## Architecture
 
@@ -43,9 +57,59 @@ Pipeline: **Parse → Normalize → Validate → Adapt → Render**
 
 Normalization runs at temperature 0.2 (structured extraction). Adaptation runs at the default temperature 0.3.
 
-### Caching
+### Workspace and artifacts (`Sources/JPResume/Pipeline/`)
 
-All three cache files (`.normalized_cache.json`, `.rirekisho_cache.json`, `.shokumukeirekisho_cache.json`) use content-based invalidation via `CacheEnvelope<T>`. The envelope stores a SHA-256 hash of markdown content + config JSON + schema version. Stale caches are automatically invalidated when any input changes.
+Every pipeline run writes its intermediates into a workspace directory, defaulting
+to `<outputDir>/.jpresume/` (overridable via `--workspace`):
+
+```
+.jpresume/
+  inputs.json           # source path + markdown hash + effective JapanConfig
+  parsed.json           # WesternResume (role: source)
+  normalized.json       # NormalizedResume (role: source — agent edit target)
+  repaired.json         # NormalizedResume post-consistency-check (role: derived)
+  validation.json       # ValidationResult (role: derived)
+  rirekisho.json        # RirekishoData post-polish (role: source)
+  shokumukeirekisho.json
+  rirekisho.md / .pdf
+  shokumukeirekisho.md / .pdf
+  # external-mode scratch (LLM stages only):
+  <stage>.prompt.json   # written by --external
+  <stage>.response.json # supplied by the caller
+  <stage>.error.json    # written when --ingest fails
+```
+
+Key types:
+
+- `Artifact<T>` (`Pipeline/Artifact.swift`) — typed envelope with `kind`, `role`
+  (`"source"`/`"derived"`), `schema_version`, `content_hash`, `inputs_hash`,
+  `produced_at`, `produced_by`, `mode` (`"internal"`/`"external"`), and structured
+  `warnings`. Supersedes the old `CacheEnvelope<T>`.
+- `ArtifactStore` (`Pipeline/ArtifactStore.swift`) — typed read/write with atomic
+  `replaceItem` writes, a four-state `ArtifactStatus` (`.fresh` / `.stale(reason)` /
+  `.missing` / `.invalid(reason)`), and legacy fallback for
+  `.{normalized,rirekisho,shokumukeirekisho}_cache.json` (one-release window).
+- `Stages` (`Pipeline/Stages.swift`) — stateless wrappers around the existing
+  pipeline modules. Commands chain these against one `ArtifactStore`; no
+  orchestration lives in the core modules.
+- `ExternalBridge` (`Pipeline/ExternalBridge.swift`) — emits/reads prompt bundles
+  with the grammar documented in `Pipeline/ExternalBridge.swift`
+  (`stage`, `artifact_kind`, `source_artifacts`, `stage_options`,
+  `expected_output_format`, `response_schema`, `response_path`).
+- `ArtifactHashes` — stage-aware content hashes. In particular,
+  `ArtifactHashes.shokumukeirekisho` folds in `GenerationOptions`, so
+  `--include-side-projects` and `--exclude-older-roles` now correctly invalidate
+  the cache (fix for the pre-refactor bug).
+- `ProducedBy` — canonical grammar for `produced_by`: deterministic stages emit
+  `jpresume/0.2.0`, LLM stages emit `jpresume/0.2.0 anthropic:claude-sonnet-4-6`,
+  external mode emits `claude-code/external <model>`.
+
+### Legacy cache format
+
+Workspaces are forward-only. On first run after upgrading, the store reads the
+legacy cache paths (`.{normalized,rirekisho,shokumukeirekisho}_cache.json`) if the
+workspace artifact is missing, then re-writes in the new envelope format. Legacy
+fallback will be removed in a future release.
 
 ### PDF Rendering
 
@@ -64,3 +128,5 @@ The rirekisho PDF is a grid-form layout drawn with absolute coordinates via `CGC
 - `work_japanese` config field stores additional work history not on the western resume (full timeline Japanese employers expect)
 - Normalization uses JapanConfig as a source of ground-truth dates when available, so user-curated entries win over LLM inference
 - AI responses are extracted via `JSONExtractor` (shared utility): code fences → direct parse → brace-match fallback
+- `generate rirekisho` and `generate shokumukeirekisho` strictly require `repaired.json`. They refuse silent fallback to `normalized.json` so the review loop isn't bypassable; `convert` runs the full chain internally, so humans lose nothing.
+- `inspect` surfaces `ArtifactStatus` reasons (`stale — hash changed (a1b2…)`, `invalid — schema version mismatch`) and flags artifacts with `role: "derived"` so hand-edits aren't silently discarded.
