@@ -7,7 +7,7 @@ struct ConvertCommand: AsyncParsableCommand {
         abstract: "Convert a western resume to Japanese format (one-shot)"
     )
 
-    @Argument(help: "Path to western-style markdown resume")
+    @Argument(help: "Path to western-style resume (.md or .pdf)")
     var input: String
 
     @Option(name: [.short, .long], help: "Output directory (default: same as input)")
@@ -78,7 +78,7 @@ struct ConvertCommand: AsyncParsableCommand {
 
         // Step 1: Parse
         print("\nStep 1: Parsing western resume...")
-        let text = try String(contentsOf: inputURL, encoding: .utf8)
+        let text = try await ResumeInputReader.read(from: inputURL)
         let western = Stages.parse(markdown: text)
         print("  Found: \(western.experience.count) work entries, "
               + "\(western.education.count) education entries, "
