@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-JPResume is a Swift CLI tool that converts western-style markdown resumes to Japanese format (履歴書 rirekisho and 職務経歴書 shokumukeirekisho). It uses CoreGraphics for native PDF rendering with Japanese fonts (Hiragino Sans).
+JPResume is a Swift CLI tool that converts western-style resumes (.md or .pdf) to Japanese format (履歴書 rirekisho and 職務経歴書 shokumukeirekisho). It uses CoreGraphics for native PDF rendering with Japanese fonts (Hiragino Sans).
 
 ## Build & Test Commands
 
 ```bash
 make build                     # swift build
-make test                      # swift test (133 tests, 12 suites)
+make test                      # swift test (148 tests, 13 suites)
 make lint                      # swiftlint lint
 make fix                       # swiftlint lint --fix
 make project                   # xcodegen generate
@@ -25,7 +25,7 @@ swift run jpresume convert examples/Kristopher_Baker_Resume.md --provider claude
 
 Two orchestration modes share the same underlying pipeline:
 
-- **`convert <input.md>`** — one-shot end-to-end run (unchanged behavior).
+- **`convert <input.md|.pdf>`** — one-shot end-to-end run (unchanged behavior).
 - **Stepwise subcommands** — `parse`, `normalize`, `validate`, `repair`, `generate
   rirekisho`, `generate shokumukeirekisho`, `render`, `inspect`. Each reads / writes
   artifacts inside a workspace so humans or agents can pause, review, and resume
@@ -44,7 +44,8 @@ application mode (adjusts 志望動機, 職務要約, 自己PR, role/achievement
 
 Pipeline: **Parse → Normalize → Validate → Adapt → Render**
 
-1. **Parser** (`Sources/JPResume/Parser/`) reads markdown into `WesternResume` (structured experience, education, skills, etc.). Uses `NSRegularExpression` for pattern matching. Supports H2, H3, and bold-text section headings.
+1. **Input reading** (`Sources/JPResume/Parser/ResumeInputReader.swift`) accepts `.md` or `.pdf`. For PDFs, `PDFKit` text extraction is attempted first; if the result is under 100 characters (scanned/image PDF), `Vision` OCR is used as fallback. The extracted text then flows into the parser unchanged.
+   **Parser** (`Sources/JPResume/Parser/MarkdownParser.swift`) converts the text into `WesternResume`. Uses `NSRegularExpression` for pattern matching. Supports H2, H3, and bold-text section headings.
 2. **Config** (`Sources/JPResume/Config/`) loads `jpresume_config.yaml` (Japan-specific fields: kanji name, furigana, education dates, work history) or prompts interactively, then saves for reuse via Yams.
 3. **Normalize** (`Sources/JPResume/AI/ResumeNormalizer.swift`) sends `WesternResume` + `JapanConfig` to LLM, returns `NormalizedResume` with structured dates, classified bullets (achievement vs responsibility), and categorized skills. Falls back to deterministic parsing if LLM fails. Cached to `.normalized_cache.json`.
 4. **Validate** (`Sources/JPResume/Validation/ResumeValidator.swift`) runs rule-based checks on `NormalizedResume`: date range validity, isCurrent consistency, overlapping roles, total years of experience, low confidence entries. Emits warnings; use `--strict` to treat them as errors.
@@ -107,7 +108,7 @@ Key types:
   `--include-side-projects` and `--exclude-older-roles` now correctly invalidate
   the cache (fix for the pre-refactor bug).
 - `ProducedBy` — canonical grammar for `produced_by`: deterministic stages emit
-  `jpresume/0.2.0`, LLM stages emit `jpresume/0.2.0 anthropic:claude-sonnet-4-6`,
+  `jpresume/0.4.0`, LLM stages emit `jpresume/0.4.0 anthropic:claude-sonnet-4-6`,
   external mode emits `claude-code/external <model>`.
 
 ### Legacy cache format
