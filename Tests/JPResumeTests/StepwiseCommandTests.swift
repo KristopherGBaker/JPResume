@@ -216,6 +216,44 @@ struct StepwiseCommandTests {
         #expect(bundle.stageOptions["era"] == "western")
     }
 
+    // MARK: - generate with --target
+
+    @Test func generateRirekishoExternalIncludesTargetInStageOptions() async throws {
+        let (project, workspace, inputsHash) = try makeParsedWorkspace()
+        defer { try? FileManager.default.removeItem(at: project) }
+        _ = try addRepairedArtifact(to: workspace, inputsHash: inputsHash)
+
+        // Write a minimal target context file
+        let ctx = TargetCompanyContext(companyName: "Acme Corp", roleTitle: "iOS Engineer",
+                                       emphasisTags: ["mobile", "consumer"])
+        let targetURL = project.appendingPathComponent("target.json")
+        try JSONEncoder().encode(ctx).write(to: targetURL)
+
+        let cmd = try GenerateRirekishoCommand.parse([
+            "--workspace", workspace.path,
+            "--target", targetURL.path,
+            "--external"
+        ])
+        try await cmd.run()
+
+        let data = try Data(contentsOf: workspace.appendingPathComponent("rirekisho.prompt.json"))
+        let bundle = try JSONDecoder().decode(PromptBundle.self, from: data)
+        #expect(bundle.stageOptions["target"] == targetURL.path)
+        // System prompt should include the company name
+        #expect(bundle.system.contains("Acme Corp"))
+    }
+
+    @Test func generateRirekishoHashDiffersWithTarget() async throws {
+        let (project, _, inputsHash) = try makeParsedWorkspace()
+        defer { try? FileManager.default.removeItem(at: project) }
+
+        let ctx = TargetCompanyContext(companyName: "TargetCo")
+        let baseHash = ArtifactHashes.rirekisho(inputsHash: inputsHash, era: .western)
+        let targetedHash = ArtifactHashes.rirekisho(inputsHash: inputsHash, era: .western,
+                                                     targetContext: ctx)
+        #expect(baseHash != targetedHash)
+    }
+
     // MARK: - inspect
 
     @Test func inspectDoesNotThrowOnEmptyWorkspace() async throws {

@@ -122,8 +122,9 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
         print("  ✓ \(workspaceURL.path)/rirekisho.json")
     }
 
-    private func buildUserMessage(repaired: NormalizedResume, config: JapanConfig,
-                                   targetContext: TargetCompanyContext?) throws -> String {
+    private func buildUserMessage(repaired: NormalizedResume,
+                                  config: JapanConfig,
+                                  targetContext: TargetCompanyContext?) throws -> String {
         buildTargetUserMessage(repaired: repaired, config: config, targetContext: targetContext)
     }
 }
@@ -251,8 +252,9 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
         print("  ✓ \(workspaceURL.path)/shokumukeirekisho.json")
     }
 
-    private func buildUserMessage(repaired: NormalizedResume, config: JapanConfig,
-                                   targetContext: TargetCompanyContext?) throws -> String {
+    private func buildUserMessage(repaired: NormalizedResume,
+                                  config: JapanConfig,
+                                  targetContext: TargetCompanyContext?) throws -> String {
         buildTargetUserMessage(repaired: repaired, config: config, targetContext: targetContext)
     }
 }
@@ -270,8 +272,9 @@ func loadTargetContext(_ path: String?) throws -> TargetCompanyContext? {
     return try JSONDecoder().decode(TargetCompanyContext.self, from: data)
 }
 
-func buildTargetUserMessage(repaired: NormalizedResume, config: JapanConfig,
-                             targetContext: TargetCompanyContext?) -> String {
+func buildTargetUserMessage(repaired: NormalizedResume,
+                            config: JapanConfig,
+                            targetContext: TargetCompanyContext?) -> String {
     let enc = JSONEncoder(); enc.outputFormatting = [.prettyPrinted, .sortedKeys]
     let r = (try? enc.encode(repaired)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
     let c = (try? enc.encode(config)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"

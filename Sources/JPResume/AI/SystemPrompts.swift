@@ -1,5 +1,6 @@
 import Foundation
 
+// swiftlint:disable type_body_length
 enum SystemPrompts {
     // MARK: - Normalization
 
@@ -543,3 +544,4 @@ enum SystemPrompts {
         return lines.joined(separator: "\n")
     }
 }
+// swiftlint:enable type_body_length
