@@ -40,11 +40,13 @@ enum Stages {
         repaired: NormalizedResume,
         config: JapanConfig,
         era: EraStyle,
+        targetContext: TargetCompanyContext? = nil,
         provider: any AIProvider,
         verbose: Bool
     ) async throws -> RirekishoData {
         let ai = ResumeAI(provider: provider, verbose: verbose)
-        return try await ai.generateRirekisho(normalized: repaired, config: config, era: era)
+        return try await ai.generateRirekisho(normalized: repaired, config: config, era: era,
+                                               targetContext: targetContext)
     }
 
     static func generateShokumukeirekisho(
@@ -52,11 +54,13 @@ enum Stages {
         config: JapanConfig,
         era: EraStyle,
         options: GenerationOptions,
+        targetContext: TargetCompanyContext? = nil,
         provider: any AIProvider,
         verbose: Bool
     ) async throws -> ShokumukeirekishoData {
         let ai = ResumeAI(provider: provider, verbose: verbose)
-        return try await ai.generateShokumukeirekisho(normalized: repaired, config: config, era: era, options: options)
+        return try await ai.generateShokumukeirekisho(normalized: repaired, config: config, era: era,
+                                                       options: options, targetContext: targetContext)
     }
 
     // MARK: - Polish

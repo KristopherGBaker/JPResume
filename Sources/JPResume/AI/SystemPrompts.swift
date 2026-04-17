@@ -149,7 +149,8 @@ enum SystemPrompts {
     // MARK: - 履歴書 (Rirekisho)
 
     // swiftlint:disable:next function_body_length
-    static func rirekisho(eraStyle: String, eraExample: String) -> String {
+    static func rirekisho(eraStyle: String, eraExample: String,
+                          targetContext: TargetCompanyContext? = nil) -> String {
         """
         You are an expert in Japanese resume (履歴書) formatting. You will receive:
         1. A normalized resume (JSON) with structured dates, derived experience metrics,
@@ -256,6 +257,10 @@ enum SystemPrompts {
         - licenses: only entries explicitly provided in japan_config or normalized_resume.
           Never fabricate certifications.
 
+        # Target company tailoring
+
+        \(rirekishoTargetSection(targetContext))
+
         All text output must be in Japanese.
 
         Return ONLY valid JSON matching this structure:
@@ -286,7 +291,8 @@ enum SystemPrompts {
     // MARK: - 職務経歴書 (Shokumukeirekisho)
 
     // swiftlint:disable:next function_body_length
-    static func shokumukeirekisho(eraStyle: String, options: GenerationOptions) -> String {
+    static func shokumukeirekisho(eraStyle: String, options: GenerationOptions,
+                                  targetContext: TargetCompanyContext? = nil) -> String {
         let sideProjectRule: String
         if options.includeSideProjects {
             sideProjectRule = """
@@ -455,6 +461,10 @@ enum SystemPrompts {
         Use skill_categories from the normalized resume as the primary source; remap into
         the above taxonomy as needed.
 
+        # Target company tailoring
+
+        \(shokumukeirekishoTargetSection(targetContext))
+
         # Output
 
         All text must be in Japanese. Return ONLY valid JSON matching this structure:
@@ -481,5 +491,55 @@ enum SystemPrompts {
           "self_pr": "string"
         }
         """
+    }
+
+    // MARK: - Target context helpers
+
+    private static func rirekishoTargetSection(_ ctx: TargetCompanyContext?) -> String {
+        guard let ctx else {
+            return "target_company_context is absent. Generate a neutral, reusable master 履歴書."
+        }
+        var lines = [
+            "target_company_context is provided. Tailor 志望動機 toward this employer and role.",
+            "Use only facts explicitly present in the resume, config, or target_company_context.",
+            "Do not invent company-specific motivations or alignment claims not grounded in the input.",
+        ]
+        if let name = ctx.companyName { lines.append("Target company: \(name)") }
+        if let role = ctx.roleTitle   { lines.append("Target role: \(role)") }
+        if let summary = ctx.companySummary { lines.append("Company summary: \(summary)") }
+        if let jd = ctx.jobDescriptionExcerpt { lines.append("Job description excerpt:\n\(jd)") }
+        if let reqs = ctx.normalizedRequirements, !reqs.isEmpty {
+            lines.append("Key requirements: \(reqs.joined(separator: ", "))")
+        }
+        if let tags = ctx.emphasisTags, !tags.isEmpty {
+            lines.append("Emphasis tags (weight relevant experience accordingly): \(tags.joined(separator: ", "))")
+        }
+        if let notes = ctx.candidateInterestNotes { lines.append("Candidate interest notes: \(notes)") }
+        return lines.joined(separator: "\n")
+    }
+
+    private static func shokumukeirekishoTargetSection(_ ctx: TargetCompanyContext?) -> String {
+        guard let ctx else {
+            return "target_company_context is absent. Generate a neutral, reusable master 職務経歴書."
+        }
+        var lines = [
+            "target_company_context is provided. Tailor 職務要約, 自己PR, role emphasis, and achievement",
+            "prioritization toward this employer and role.",
+            "Use only facts explicitly present in the resume, config, or target_company_context.",
+            "Do not invent company-specific motivations, role fit claims, or alignment not grounded in the input.",
+        ]
+        if let name = ctx.companyName { lines.append("Target company: \(name)") }
+        if let role = ctx.roleTitle   { lines.append("Target role: \(role)") }
+        if let summary = ctx.companySummary { lines.append("Company summary: \(summary)") }
+        if let jd = ctx.jobDescriptionExcerpt { lines.append("Job description excerpt:\n\(jd)") }
+        if let reqs = ctx.normalizedRequirements, !reqs.isEmpty {
+            lines.append("Key requirements: \(reqs.joined(separator: ", "))")
+        }
+        if let tags = ctx.emphasisTags, !tags.isEmpty {
+            lines.append("Emphasis tags — foreground roles/achievements that match these; compress less relevant ones:")
+            lines.append(tags.joined(separator: ", "))
+        }
+        if let notes = ctx.candidateInterestNotes { lines.append("Candidate interest notes: \(notes)") }
+        return lines.joined(separator: "\n")
     }
 }
