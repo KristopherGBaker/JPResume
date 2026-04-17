@@ -5,7 +5,7 @@ struct JPResume: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "jpresume",
         abstract: "Convert western-style resumes to Japanese format (履歴書・職務経歴書)",
-        version: "0.3.0",
+        version: "0.4.0",
         subcommands: [
             ConvertCommand.self,
             ParseCommand.self,
