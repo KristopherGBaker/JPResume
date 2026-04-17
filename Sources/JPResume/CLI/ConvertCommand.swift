@@ -4,7 +4,7 @@ import Foundation
 struct ConvertCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "convert",
-        abstract: "Convert a western resume to Japanese format"
+        abstract: "Convert a western resume to Japanese format (one-shot)"
     )
 
     @Argument(help: "Path to western-style markdown resume")
@@ -15,6 +15,9 @@ struct ConvertCommand: AsyncParsableCommand {
 
     @Option(name: [.short, .long], help: "Path to YAML config file")
     var config: String?
+
+    @Option(help: "Workspace directory for intermediate artifacts (default: <outputDir>/.jpresume)")
+    var workspace: String?
 
     @Flag(help: "Re-prompt for all Japan-specific fields")
     var reconfigure = false
@@ -66,11 +69,14 @@ struct ConvertCommand: AsyncParsableCommand {
         let outputURL = outputDir.map { URL(fileURLWithPath: $0) } ?? inputDir
         let configURL = config.map { URL(fileURLWithPath: $0) }
             ?? inputDir.appendingPathComponent("jpresume_config.yaml")
+        let workspaceURL = workspace.map { URL(fileURLWithPath: $0) }
+            ?? outputURL.appendingPathComponent(".jpresume")
+        let store = ArtifactStore(root: workspaceURL)
 
         // Step 1: Parse
         print("\nStep 1: Parsing western resume...")
         let text = try String(contentsOf: inputURL, encoding: .utf8)
-        let western = MarkdownParser.parse(text)
+        let western = Stages.parse(markdown: text)
         print("  Found: \(western.experience.count) work entries, "
               + "\(western.education.count) education entries, "
               + "\(western.skills.count) skills")
@@ -80,32 +86,23 @@ struct ConvertCommand: AsyncParsableCommand {
         let japanConfig = try ConfigManager.loadOrPrompt(
             path: configURL, western: western, forceReconfigure: reconfigure
         )
+        let enc = JSONEncoder(); enc.outputFormatting = [.sortedKeys]
+        let configData = try? enc.encode(japanConfig)
+        let inputsHash = ArtifactHashes.inputs(markdownContent: text, configData: configData)
+        let by = ProducedBy.jpresume()
 
-        // Compute content hash for all caches (markdown + config + schema version)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        let configData = try? encoder.encode(japanConfig)
-        let cacheHash = AICache.contentHash(markdownContent: text, configData: configData)
+        let inputsData = InputsData(sourcePath: inputURL.path, markdownHash: inputsHash, config: japanConfig)
+        try store.write(inputsData, kind: .inputs, contentHash: inputsHash, inputsHash: inputsHash, producedBy: by)
+        try store.write(western, kind: .parsed, contentHash: inputsHash, inputsHash: inputsHash, producedBy: by)
 
-        // Step 3: Normalize
+        // Step 3: Normalize (with cache)
         print("\nStep 3: Normalizing resume...")
-        let normalizedCache = outputURL.appendingPathComponent(".normalized_cache.json")
-        var normalized: NormalizedResume
-
-        if !noCache, let cached: NormalizedResume = AICache.load(from: normalizedCache, expectedHash: cacheHash) {
-            print("  Using cached normalized resume")
-            normalized = cached
-        } else {
-            let providerInstance = try ProviderFactory.create(provider: provider.rawValue, model: model)
-            print("  Using AI provider: \(providerInstance.name)")
-            let normalizer = ResumeNormalizer(provider: providerInstance, verbose: verbose)
-            normalized = try await normalizer.normalize(western: western, config: japanConfig)
-            try AICache.save(normalized, to: normalizedCache, contentHash: cacheHash)
-        }
+        let normalized = try await resolveNormalized(store: store, western: western, config: japanConfig,
+                                                      inputsHash: inputsHash, producedBy: by)
 
         // Step 4: Validate
         print("\nStep 4: Validating...")
-        let validation = ResumeValidator.validate(normalized)
+        let validation = Stages.validate(normalized)
         if validation.hasIssues {
             ResumeValidator.printResult(validation)
             if strict && !validation.isValid {
@@ -119,151 +116,212 @@ struct ConvertCommand: AsyncParsableCommand {
                 print("  ✓ Valid")
             }
         }
+        let validationWarnings = validation.issues.map { $0.asArtifactWarning }
+        try store.write(validation, kind: .validation, contentHash: inputsHash, inputsHash: inputsHash,
+                        producedBy: by, warnings: validationWarnings)
 
-        // Step 4b: Consistency check and repair
+        // Step 4b: Repair
         print("\nStep 4b: Checking consistency and repairing...")
-        normalized = ResumeConsistencyChecker.check(normalized)
-        if !normalized.repairs.isEmpty {
-            for repair in normalized.repairs {
-                print("  ⚙ \(repair.field): \(repair.reason)")
-            }
-        }
-        if let derived = normalized.derivedExperience {
-            print("  Derived: \(derived.totalSoftwareYears) years total software experience")
-            if let ios = derived.iosYears { print("  Derived: \(ios) years iOS experience") }
-            if let jp = derived.jpWorkYears { print("  Derived: \(jp) years Japan-based work") }
-            if derived.hasInternationalTeamExperience { print("  Derived: international team experience detected") }
-        }
+        let repaired = Stages.repair(normalized)
+        try store.write(repaired, kind: .repaired, contentHash: inputsHash, inputsHash: inputsHash, producedBy: by)
+        printRepairs(repaired)
 
         if dryRun {
             let prettyEncoder = JSONEncoder()
             prettyEncoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-
             print("\nParsed resume (WesternResume):")
-            let westernJSON = try prettyEncoder.encode(western)
-            print(String(data: westernJSON, encoding: .utf8)!)
-
+            print(String(data: try prettyEncoder.encode(western), encoding: .utf8)!)
             print("\nNormalized resume (NormalizedResume):")
-            let normalizedJSON = try prettyEncoder.encode(normalized)
-            print(String(data: normalizedJSON, encoding: .utf8)!)
-
+            print(String(data: try prettyEncoder.encode(normalized), encoding: .utf8)!)
             print("\nDry run complete. No output generated.")
             return
         }
 
-        // Steps 5 & 6: Adapt, Polish, and Render
+        // Step 5: Generate rirekisho + shokumukeirekisho
         let genOptions = GenerationOptions(
             includeSideProjects: includeSideProjects,
             includeOlderIrrelevantRoles: !excludeOlderRoles
         )
-        let (rirekishoData, shokumukeirekishoData) = try await adapt(
-            normalized: normalized, config: japanConfig, outputURL: outputURL,
-            cacheHash: cacheHash, options: genOptions
+        let rHash = ArtifactHashes.rirekisho(inputsHash: inputsHash, era: era)
+        let sHash = ArtifactHashes.shokumukeirekisho(inputsHash: inputsHash, era: era, options: genOptions)
+
+        print("\nStep 5: Translating and adapting with AI...")
+        let (rirekishoData, shokumukeirekishoData) = try await resolveJPData(
+            store: store, repaired: repaired, config: japanConfig, genOptions: genOptions,
+            inputsHash: inputsHash, rirekishoHash: rHash, shokumuHash: sHash, producedBy: by
         )
 
-        // Step 5b: Polish generated content with deterministic rules
-        let derived = normalized.derivedExperience
-        let polishedRirekisho = rirekishoData.map { JapanesePolishRules.polish($0, derived: derived) }
-        let polishedShokumu = shokumukeirekishoData.map { JapanesePolishRules.polish($0, derived: derived) }
+        // Step 5b: Polish
+        let derived = repaired.derivedExperience
+        let polishedRirekisho = rirekishoData.map { Stages.polish($0, derived: derived) }
+        let polishedShokumu = shokumukeirekishoData.map { Stages.polish($0, derived: derived) }
 
-        try render(rirekisho: polishedRirekisho, shokumukeirekisho: polishedShokumu, to: outputURL)
+        if let r = polishedRirekisho {
+            try store.write(r, kind: .rirekisho, contentHash: rHash, inputsHash: inputsHash, producedBy: by)
+        }
+        if let s = polishedShokumu {
+            try store.write(s, kind: .shokumukeirekisho, contentHash: sHash, inputsHash: inputsHash, producedBy: by)
+        }
 
-        print("\nDone!")
+        // Step 6: Render
+        print("\nStep 6: Generating output files...")
+        try FileManager.default.createDirectory(at: outputURL, withIntermediateDirectories: true)
+        try renderOutput(rirekisho: polishedRirekisho, shokumukeirekisho: polishedShokumu, to: outputURL)
+
+        print("\nDone! Workspace: \(workspaceURL.path)")
     }
 }
 
 // MARK: - Private helpers
 
 extension ConvertCommand {
-    private func adapt(
-        normalized: NormalizedResume,
+    private func resolveNormalized(
+        store: ArtifactStore,
+        western: WesternResume,
         config: JapanConfig,
-        outputURL: URL,
-        cacheHash: String,
-        options: GenerationOptions = GenerationOptions()
-    ) async throws -> (RirekishoData?, ShokumukeirekishoData?) {
-        let generateRirekisho = !shokumukeirekishoOnly
-        let generateShokumukeirekisho = !rirekishoOnly
-
-        var rirekishoData: RirekishoData?
-        var shokumukeirekishoData: ShokumukeirekishoData?
-
-        let rirekishoCache = outputURL.appendingPathComponent(".rirekisho_cache.json")
-        let shokumuCache = outputURL.appendingPathComponent(".shokumukeirekisho_cache.json")
-
-        if generateRirekisho && !noCache {
-            rirekishoData = AICache.load(from: rirekishoCache, expectedHash: cacheHash)
-            if rirekishoData != nil { print("\nStep 5: Using cached 履歴書 data") }
-        }
-        if generateShokumukeirekisho && !noCache {
-            shokumukeirekishoData = AICache.load(from: shokumuCache, expectedHash: cacheHash)
-            if shokumukeirekishoData != nil { print("  Using cached 職務経歴書 data") }
-        }
-
-        let needsAI = (generateRirekisho && rirekishoData == nil)
-            || (generateShokumukeirekisho && shokumukeirekishoData == nil)
-
-        if needsAI {
-            print("\nStep 5: Translating and adapting with AI...")
-            let ai = try ResumeAI(provider: provider.rawValue, model: model, verbose: verbose)
-
-            if generateRirekisho && rirekishoData == nil {
-                print("  Generating 履歴書...")
-                rirekishoData = try await ai.generateRirekisho(
-                    normalized: normalized, config: config, era: era
-                )
-                try AICache.save(rirekishoData!, to: rirekishoCache, contentHash: cacheHash)
+        inputsHash: String,
+        producedBy: String
+    ) async throws -> NormalizedResume {
+        if !noCache {
+            if store.status(.normalized, expectedContentHash: inputsHash) == .fresh,
+               let artifact = try? store.read(.normalized, as: NormalizedResume.self) {
+                let age = store.producedAt(.normalized).map { formatAge($0) } ?? "?"
+                let by = store.producedBy(.normalized) ?? "unknown"
+                print("  Using cached normalized resume (\(by), \(age))")
+                return artifact.data
             }
-
-            if generateShokumukeirekisho && shokumukeirekishoData == nil {
-                print("  Generating 職務経歴書...")
-                shokumukeirekishoData = try await ai.generateShokumukeirekisho(
-                    normalized: normalized, config: config, era: era, options: options
-                )
-                try AICache.save(shokumukeirekishoData!, to: shokumuCache, contentHash: cacheHash)
+            if let legacy: NormalizedResume = store.loadLegacy(.normalized, expectedHash: inputsHash) {
+                print("  Using legacy cached normalized resume (upgrading to workspace format)")
+                // Legacy caches don't record their producer, so don't instantiate one here.
+                try store.write(legacy, kind: .normalized, contentHash: inputsHash, inputsHash: inputsHash,
+                                producedBy: ProducedBy.jpresume())
+                return legacy
             }
         }
-
-        return (rirekishoData, shokumukeirekishoData)
+        let providerInstance = try ProviderFactory.create(provider: provider.rawValue, model: model)
+        print("  Using AI provider: \(providerInstance.name)")
+        let result = try await Stages.normalize(western: western, config: config,
+                                                provider: providerInstance, verbose: verbose)
+        try store.write(result, kind: .normalized, contentHash: inputsHash, inputsHash: inputsHash,
+                        producedBy: ProducedBy.jpresume(providerSlug: provider.rawValue, modelOverride: model))
+        return result
     }
 
-    private func render(
+    private func resolveJPData(
+        store: ArtifactStore,
+        repaired: NormalizedResume,
+        config: JapanConfig,
+        genOptions: GenerationOptions,
+        inputsHash: String,
+        rirekishoHash: String,
+        shokumuHash: String,
+        producedBy: String
+    ) async throws -> (RirekishoData?, ShokumukeirekishoData?) {
+        let generateR = !shokumukeirekishoOnly
+        let generateS = !rirekishoOnly
+
+        var rirekishoData: RirekishoData?
+        var shokumuData: ShokumukeirekishoData?
+
+        if generateR && !noCache {
+            if store.status(.rirekisho, expectedContentHash: rirekishoHash) == .fresh,
+               let artifact = try? store.read(.rirekisho, as: RirekishoData.self) {
+                let age = store.producedAt(.rirekisho).map { formatAge($0) } ?? "?"
+                let by = store.producedBy(.rirekisho) ?? "unknown"
+                print("  Using cached 履歴書 data (\(by), \(age))")
+                rirekishoData = artifact.data
+            } else if let legacy: RirekishoData = store.loadLegacy(.rirekisho, expectedHash: inputsHash) {
+                // Legacy cache was keyed by inputsHash only; era/options weren't in the hash.
+                // Trusting it matches the spirit of the pre-existing behavior for one release.
+                print("  Using legacy cached 履歴書 data (upgrading to workspace format)")
+                try store.write(legacy, kind: .rirekisho, contentHash: rirekishoHash, inputsHash: inputsHash,
+                                producedBy: ProducedBy.jpresume())
+                rirekishoData = legacy
+            }
+        }
+        if generateS && !noCache {
+            if store.status(.shokumukeirekisho, expectedContentHash: shokumuHash) == .fresh,
+               let artifact = try? store.read(.shokumukeirekisho, as: ShokumukeirekishoData.self) {
+                let age = store.producedAt(.shokumukeirekisho).map { formatAge($0) } ?? "?"
+                let by = store.producedBy(.shokumukeirekisho) ?? "unknown"
+                print("  Using cached 職務経歴書 data (\(by), \(age))")
+                shokumuData = artifact.data
+            } else if let legacy: ShokumukeirekishoData = store.loadLegacy(.shokumukeirekisho, expectedHash: inputsHash) {
+                print("  Using legacy cached 職務経歴書 data (upgrading to workspace format)")
+                try store.write(legacy, kind: .shokumukeirekisho, contentHash: shokumuHash, inputsHash: inputsHash,
+                                producedBy: ProducedBy.jpresume())
+                shokumuData = legacy
+            }
+        }
+
+        let needsAI = (generateR && rirekishoData == nil) || (generateS && shokumuData == nil)
+        if needsAI {
+            let providerInstance = try ProviderFactory.create(provider: provider.rawValue, model: model)
+            print("  Using AI provider: \(providerInstance.name)")
+
+            if generateR && rirekishoData == nil {
+                print("  Generating 履歴書...")
+                rirekishoData = try await Stages.generateRirekisho(
+                    repaired: repaired, config: config, era: era,
+                    provider: providerInstance, verbose: verbose
+                )
+            }
+            if generateS && shokumuData == nil {
+                print("  Generating 職務経歴書...")
+                shokumuData = try await Stages.generateShokumukeirekisho(
+                    repaired: repaired, config: config, era: era, options: genOptions,
+                    provider: providerInstance, verbose: verbose
+                )
+            }
+        }
+
+        return (rirekishoData, shokumuData)
+    }
+
+    private func renderOutput(
         rirekisho rirekishoData: RirekishoData?,
-        shokumukeirekisho shokumukeirekishoData: ShokumukeirekishoData?,
+        shokumukeirekisho shokumuData: ShokumukeirekishoData?,
         to outputURL: URL
     ) throws {
-        print("\nStep 6: Generating output files...")
-        try FileManager.default.createDirectory(at: outputURL, withIntermediateDirectories: true)
-
         let wantMarkdown = format == .markdown || format == .both
         let wantPDF = format == .pdf || format == .both
 
         if let data = rirekishoData {
             if wantMarkdown {
-                let md = MarkdownRenderer.renderRirekisho(data)
                 let path = outputURL.appendingPathComponent("rirekisho.md")
-                try md.write(to: path, atomically: true, encoding: .utf8)
+                try Stages.renderMarkdown(rirekisho: data).write(to: path, atomically: true, encoding: .utf8)
                 print("  ✓ \(path.path)")
             }
             if wantPDF {
                 let path = outputURL.appendingPathComponent("rirekisho.pdf")
-                try RirekishoPDFRenderer.render(data: data, to: path)
+                try Stages.renderPDF(rirekisho: data, to: path)
                 print("  ✓ \(path.path)")
             }
         }
 
-        if let data = shokumukeirekishoData {
+        if let data = shokumuData {
             if wantMarkdown {
-                let md = MarkdownRenderer.renderShokumukeirekisho(data)
                 let path = outputURL.appendingPathComponent("shokumukeirekisho.md")
-                try md.write(to: path, atomically: true, encoding: .utf8)
+                try Stages.renderMarkdown(shokumukeirekisho: data).write(to: path, atomically: true, encoding: .utf8)
                 print("  ✓ \(path.path)")
             }
             if wantPDF {
                 let path = outputURL.appendingPathComponent("shokumukeirekisho.pdf")
-                try ShokumukeirekishoPDFRenderer.render(data: data, to: path)
+                try Stages.renderPDF(shokumukeirekisho: data, to: path)
                 print("  ✓ \(path.path)")
             }
+        }
+    }
+
+    private func printRepairs(_ repaired: NormalizedResume) {
+        for repair in repaired.repairs {
+            print("  ⚙ \(repair.field): \(repair.reason)")
+        }
+        if let derived = repaired.derivedExperience {
+            print("  Derived: \(derived.totalSoftwareYears) years total software experience")
+            if let ios = derived.iosYears { print("  Derived: \(ios) years iOS experience") }
+            if let jp = derived.jpWorkYears { print("  Derived: \(jp) years Japan-based work") }
+            if derived.hasInternationalTeamExperience { print("  Derived: international team experience detected") }
         }
     }
 }
@@ -282,4 +340,13 @@ enum ProviderChoice: String, ExpressibleByArgument, Sendable {
 
 enum EraStyle: String, ExpressibleByArgument, Sendable {
     case western, japanese
+}
+
+// MARK: - Age formatter (shared by commands)
+
+func formatAge(_ date: Date) -> String {
+    let secs = -date.timeIntervalSinceNow
+    if secs < 3600 { return "\(Int(secs / 60))m ago" }
+    if secs < 86400 { return "\(Int(secs / 3600))h ago" }
+    return "\(Int(secs / 86400))d ago"
 }
