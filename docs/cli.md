@@ -3,7 +3,7 @@
 ## One-shot conversion
 
 ```
-jpresume convert <input.md> [options]
+jpresume convert <input.md|.pdf> [options]
 
 Options:
   -o, --output-dir DIR          Output directory (default: same as input)
@@ -54,9 +54,9 @@ When present, 志望動機, 職務要約, 自己PR, and role/achievement emphasi
 
 ## Pipeline
 
-Each stage writes a versioned JSON artifact into `.jpresume/`. Reruns skip unchanged work via SHA-256 content hashing (covers input markdown + config + era + generation options + schema version).
+Each stage writes a versioned JSON artifact into `.jpresume/`. Reruns skip unchanged work via SHA-256 content hashing (covers input content + config + era + generation options + schema version).
 
-1. **Parse** — markdown → `WesternResume`
+1. **Parse** — `.md` or `.pdf` → `WesternResume`. PDF text is extracted via PDFKit; scanned/image PDFs fall back to Vision OCR automatically.
 2. **Config** — loads `jpresume_config.yaml` or prompts interactively; saved for reuse
 3. **Normalize** — LLM structures dates, classifies bullets (achievement vs responsibility), groups skills. Falls back to deterministic parsing if LLM fails. Config dates are ground truth.
 4. **Validate** — checks date ranges, overlaps, `is_current` consistency, total experience, low-confidence entries. `--strict` treats warnings as errors.
@@ -69,7 +69,7 @@ Each stage writes a versioned JSON artifact into `.jpresume/`. Reruns skip uncha
 For human review between stages or for use by an agent skill:
 
 ```
-jpresume parse <input.md> [--workspace .jpresume]
+jpresume parse <input.md|.pdf> [--workspace .jpresume]
 jpresume normalize [--workspace] [--provider] [--external | --ingest]
 jpresume validate [--workspace] [--on normalized|repaired]
 jpresume repair [--workspace]
@@ -101,9 +101,9 @@ $ jpresume inspect --workspace .jpresume
 
 Artifact                  Status     Produced by                          Age
 ──────────────────────────────────────────────────────────────────────────────
-inputs.json               ✓ fresh    jpresume/0.3.0                        2m ago
-parsed.json               ✓ fresh    jpresume/0.3.0                        2m ago
-normalized.json           ~ stale    jpresume/0.3.0 ollama:gemma4          1h ago
+inputs.json               ✓ fresh    jpresume/0.4.0                        2m ago
+parsed.json               ✓ fresh    jpresume/0.4.0                        2m ago
+normalized.json           ~ stale    jpresume/0.4.0 ollama:gemma4          1h ago
 repaired.json               missing
 ```
 

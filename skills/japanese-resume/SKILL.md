@@ -1,6 +1,6 @@
 ---
 name: japanese-resume
-description: Create and iteratively refine Japanese-style resumes — 履歴書 (rirekisho) and 職務経歴書 (shokumukeirekisho) — from a western markdown resume using the JPResume CLI. Use when the user mentions Japanese resumes, rirekisho, shokumukeirekisho, applying to Japanese companies, or refining an existing .jpresume workspace.
+description: Create and iteratively refine Japanese-style resumes — 履歴書 (rirekisho) and 職務経歴書 (shokumukeirekisho) — from a western resume (.md or .pdf) using the JPResume CLI. Use when the user mentions Japanese resumes, rirekisho, shokumukeirekisho, applying to Japanese companies, or refining an existing .jpresume workspace.
 ---
 
 # Japanese Resume Builder (JPResume)
@@ -21,7 +21,7 @@ Tool: `jpresume` (Swift CLI from the JPResume repo; typically installed at `/usr
 
 - User asks to generate, update, or refine a 履歴書 / 職務経歴書 / rirekisho / shokumukeirekisho
 - User is applying to Japanese companies and needs JP-format CVs
-- User points at a markdown resume and wants Japanese output
+- User points at a markdown or PDF resume and wants Japanese output
 - User wants to iterate on an existing `.jpresume/` workspace (review warnings, fix dates, regenerate a section)
 
 ## Preflight checklist
@@ -29,7 +29,7 @@ Tool: `jpresume` (Swift CLI from the JPResume repo; typically installed at `/usr
 Before the first stage:
 
 1. Verify the CLI: `jpresume --version`. If missing, install from the JPResume repo root with `make install`.
-2. Locate the input markdown and the `jpresume_config.yaml`. Default layout is `<dir>/resume.md` + `<dir>/jpresume_config.yaml`.
+2. Locate the input resume (`.md` or `.pdf`) and the `jpresume_config.yaml`. Default layout is `<dir>/resume.md` (or `resume.pdf`) + `<dir>/jpresume_config.yaml`. PDF inputs are supported natively — text-layer PDFs are read directly; scanned/image PDFs fall back to Vision OCR automatically.
 3. If the config is missing, see [references/config-schema.md](references/config-schema.md) and draft one with the user — do NOT run `jpresume parse` expecting interactive prompts (they only work on a TTY you can't drive).
 4. Pick a workspace directory. Default is `<input-dir>/.jpresume/`. Use `--workspace` to override when running multiple variants.
 
@@ -56,10 +56,10 @@ Return ONLY JSON in the response file. No prose, no markdown commentary. Code fe
 ### 1. Parse (deterministic, no LLM)
 
 ```bash
-jpresume parse <input.md> --workspace <ws>
+jpresume parse <input.md|.pdf> --workspace <ws>
 ```
 
-Produces `inputs.json` (source path + hash + effective `JapanConfig` snapshot) and `parsed.json` (a `WesternResume`). No review needed — it's deterministic.
+Accepts `.md` or `.pdf`. PDF text is extracted automatically (PDFKit for text-layer PDFs; Vision OCR for scanned/image PDFs). Produces `inputs.json` (source path + hash + effective `JapanConfig` snapshot) and `parsed.json` (a `WesternResume`). No review needed — it's deterministic.
 
 ### 2. Normalize (LLM — you drive)
 

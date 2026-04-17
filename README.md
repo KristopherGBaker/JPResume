@@ -36,7 +36,7 @@ jpresume convert resume.md --provider claude-cli --format both
 
 ## Features
 
-- Parses markdown resumes (H2, H3, and bold-text section headings)
+- Parses markdown and PDF resumes (text-layer extraction; Vision OCR fallback for scanned PDFs)
 - LLM normalization — structured dates, bullet classification (achievement vs responsibility), skill grouping
 - Validation — date ranges, overlapping roles, `is_current` consistency, total experience
 - Interactive Japan-specific config — kanji name, furigana, education dates, work history, licenses — saved to YAML for reuse
