@@ -1,0 +1,41 @@
+# Fictional example config paired to examples/resume.md (John Smith).
+# Copy this next to a resume markdown file, rename to jpresume_config.yaml,
+# and replace every value with the candidate's real data before running jpresume.
+name_kanji: スミス　ジョン
+name_furigana: スミス　ジョン
+date_of_birth: '1991-06-15'
+gender: Male
+address_current:
+  postal_code: 100-0001
+  prefecture: 東京都
+  city: 千代田区
+  line1: 千代田1-1-1
+  furigana: ちよだ1-1-1
+phone: 090-1234-5678
+email: john.smith@example.com
+spouse: false
+dependents: 0
+dependents_excl_spouse: 0
+education_japanese:
+  - year_month: 2009年8月
+    description: University of California, Berkeley コンピュータサイエンス学部 入学
+  - year_month: 2013年5月
+    description: University of California, Berkeley コンピュータサイエンス学部 卒業
+work_japanese:
+  - year_month: 2013年6月
+    description: WebDev Agency 入社
+  - year_month: 2016年2月
+    description: 一身上の都合により退職
+  - year_month: 2016年3月
+    description: TechStart Inc 入社
+  - year_month: 2019年12月
+    description: 一身上の都合により退職
+  - year_month: 2020年1月
+    description: Acme Corp 入社
+licenses:
+  - year_month: 2021年6月
+    name: Google Cloud Professional Data Engineer
+  - year_month: 2022年3月
+    name: AWS Solutions Architect Associate
+  - year_month: 2022年7月
+    name: JLPT N2
