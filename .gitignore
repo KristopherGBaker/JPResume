@@ -7,3 +7,6 @@ DerivedData/
 *.pdf
 jpresume_config.yaml
 .*_cache.json
+.claude/settings.local.json
+examples/rirekisho.md
+examples/shokumukeirekisho.md
