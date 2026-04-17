@@ -220,6 +220,23 @@ struct NormalizedResume: Codable, Sendable {
         case timelineWarnings = "timeline_warnings"
     }
 
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decodeIfPresent(String.self, forKey: .name)
+        contact = (try? c.decode(ContactInfo.self, forKey: .contact)) ?? ContactInfo()
+        summary = try c.decodeIfPresent(String.self, forKey: .summary)
+        experience = (try? c.decode([NormalizedWorkEntry].self, forKey: .experience)) ?? []
+        education = (try? c.decode([NormalizedEducationEntry].self, forKey: .education)) ?? []
+        skillCategories = (try? c.decode([SkillCategory].self, forKey: .skillCategories)) ?? []
+        certifications = (try? c.decode([String].self, forKey: .certifications)) ?? []
+        languages = (try? c.decode([String].self, forKey: .languages)) ?? []
+        normalizerNotes = (try? c.decode([String].self, forKey: .normalizerNotes)) ?? []
+        rawSections = (try? c.decode([String: String].self, forKey: .rawSections)) ?? [:]
+        derivedExperience = try? c.decodeIfPresent(DerivedExperience.self, forKey: .derivedExperience)
+        timelineWarnings = try? c.decodeIfPresent([String].self, forKey: .timelineWarnings)
+        repairs = (try? c.decode([RepairNote].self, forKey: .repairs)) ?? []
+    }
+
     init(
         name: String? = nil,
         contact: ContactInfo = ContactInfo(),
