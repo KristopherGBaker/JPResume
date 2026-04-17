@@ -222,10 +222,13 @@ enum RirekishoPDFRenderer {
         let motLblH: CGFloat = 14.17 // 5mm
         let motFont = PDFFont.japanese(size: 7)
         let motTextW = contentW - 11.34
+        let motRawH: CGFloat
         let motTextH: CGFloat
         if let motivation = data.motivation {
-            motTextH = measureWrappedText(motivation, maxWidth: motTextW, font: motFont) + 8
+            motRawH = measureWrappedText(motivation, maxWidth: motTextW, font: motFont)
+            motTextH = motRawH + 8
         } else {
+            motRawH = 0
             motTextH = 28.35 // minimum empty space
         }
         let motH = motLblH + motTextH + 4 // label + text + padding
@@ -237,8 +240,11 @@ enum RirekishoPDFRenderer {
                  at: CGPoint(x: x0 + 5.67, y: y - motLblH + 4),
                  font: PDFFont.japanese(size: 6), in: ctx)
         if let motivation = data.motivation {
-            drawWrappedText(motivation, at: CGPoint(x: x0 + 5.67, y: y - motLblH - 2),
-                            maxWidth: motTextW, height: motTextH, font: motFont, in: ctx)
+            let textAreaH = motH - motLblH
+            let topPadding = max(2, (textAreaH - motRawH) / 2)
+            drawWrappedText(motivation,
+                            at: CGPoint(x: x0 + 5.67, y: y - motLblH - topPadding),
+                            maxWidth: motTextW, height: motRawH, font: motFont, in: ctx)
         }
         y -= motH
 
@@ -273,7 +279,8 @@ enum RirekishoPDFRenderer {
             drawFilledBox(ctx: ctx, x: bx, y: y, w: colW, h: botLblH)
             drawTextCentered(label, at: CGPoint(x: bx + colW / 2, y: y - botLblH + 4),
                              font: PDFFont.japanese(size: 6), in: ctx)
-            drawTextCentered(value, at: CGPoint(x: bx + colW / 2, y: y - botH / 2 - 5),
+            let valueCenterY = y - (botLblH + botH) / 2
+            drawTextCentered(value, at: CGPoint(x: bx + colW / 2, y: valueCenterY - 2.5),
                              font: PDFFont.japanese(size: 8), in: ctx)
         }
     }

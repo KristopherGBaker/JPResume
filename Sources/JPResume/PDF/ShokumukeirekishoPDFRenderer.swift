@@ -126,13 +126,27 @@ enum ShokumukeirekishoPDFRenderer {
         let skillFont = PDFFont.japanese(size: 8)
         let skillBoldFont = PDFFont.japaneseBold(size: 8)
         for (category, skills) in data.technicalSkills {
-            newPageIfNeeded(needed: 14)
-            drawText("\(category): ", at: CGPoint(x: margin + 8, y: y - 8), font: skillBoldFont, in: ctx)
-            // Measure category label width and draw skills after it
-            let labelWidth = measureText("\(category): ", font: skillBoldFont)
-            drawText(skills.joined(separator: ", "),
-                     at: CGPoint(x: margin + 8 + labelWidth, y: y - 8), font: skillFont, in: ctx)
-            y -= 14
+            let label = "\(category): "
+            let labelWidth = measureText(label, font: skillBoldFont)
+            let skillsText = skills.joined(separator: ", ")
+            let skillsMaxW = contentW - 8 - labelWidth
+            let skillsH = measureParagraphHeight(skillsText, maxWidth: skillsMaxW, font: skillFont)
+            let rowH = max(14, skillsH + 2)
+            newPageIfNeeded(needed: rowH)
+
+            drawText(label, at: CGPoint(x: margin + 8, y: y - 8), font: skillBoldFont, in: ctx)
+
+            let attrs: [NSAttributedString.Key: Any] = [.font: skillFont, .foregroundColor: NSColor.black]
+            let attrStr = NSAttributedString(string: skillsText, attributes: attrs)
+            let framesetter = CTFramesetterCreateWithAttributedString(attrStr)
+            let path = CGMutablePath()
+            path.addRect(CGRect(x: margin + 8 + labelWidth,
+                                y: (y - 8) - skillsH + skillFont.ascender,
+                                width: skillsMaxW, height: skillsH))
+            let frame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), path, nil)
+            CTFrameDraw(frame, ctx)
+
+            y -= rowH
         }
 
         y -= 8
