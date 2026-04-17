@@ -2,7 +2,31 @@
 
 Convert western-style resumes to Japanese format: 履歴書 (rirekisho) and 職務経歴書 (shokumukeirekisho).
 
-Takes a markdown resume as input, gathers Japan-specific details interactively, uses AI to translate and adapt the content, and generates both markdown and PDF output.
+Takes a markdown resume as input, gathers Japan-specific details, uses AI to translate and adapt the content, and generates both markdown and PDF output.
+
+## Recommended usage — agent skill
+
+The best way to use JPResume is through its **agent skill** with Claude Code, Cursor, Codex, or another supported AI coding assistant. The agent drives the pipeline stage-by-stage in `--external` mode: it acts as the LLM for the normalize and generate stages, pauses after validation so you can review and correct the normalized resume, and produces output you can inspect and refine interactively — all without leaving your editor.
+
+Install the skill:
+
+```bash
+npx skills add KristopherGBaker/JPResume
+```
+
+Then ask your agent: *"Help me create a Japanese resume from my resume.md"* or *"Generate a rirekisho for [company name]"*.
+
+The agent will:
+1. Run `jpresume parse` → `normalize` → `repair` → `validate` (and pause for your review)
+2. Produce the 履歴書 and 職務経歴書 JSON itself, in external mode
+3. Ask about era style, side projects, older roles, and — if applying to a specific company — use `--target` to tailor 志望動機, 職務要約, and 自己PR
+4. Render final PDF and markdown output
+
+See [skills/japanese-resume/SKILL.md](skills/japanese-resume/SKILL.md) for the full protocol and the [references/](skills/japanese-resume/references/) folder for config schema and examples.
+
+---
+
+The CLI can also be used standalone for one-shot or batch generation — see [Usage](#usage) below.
 
 ## Features
 
@@ -75,11 +99,14 @@ Options:
   --provider PROVIDER           AI provider (default: ollama)
   --model MODEL                 Model name override
   --era {western,japanese}      Date format: 2024年3月 vs 令和6年3月 (default: western)
+  --target PATH                 Path to target-company context JSON (tailored application mode)
   --no-cache                    Ignore all cached output and regenerate
   --strict                      Treat validation warnings as errors
   --dry-run                     Parse + normalize only, print both and exit
   -v, --verbose                 Show AI prompts/responses
 ```
+
+**Target-company context** (`--target company.json`) switches from neutral master-document mode to tailored application mode. The JSON file can contain any combination of: `company_name`, `role_title`, `company_summary`, `job_description_excerpt`, `normalized_requirements`, `emphasis_tags` (e.g. `"mobile"`, `"consumer"`, `"growth"`, `"ai"`), `candidate_interest_notes`. When present, 志望動機, 職務要約, 自己PR, and role emphasis are adjusted toward the target — using only facts from the input, never fabricating.
 
 For per-stage commands (`parse`, `normalize`, `validate`, `repair`, `generate`, `render`, `inspect`), see the [Stepwise / agent workflow](#stepwise--agent-workflow) section.
 
@@ -115,8 +142,8 @@ jpresume parse <input.md> [--workspace .jpresume]
 jpresume normalize [--workspace] [--provider] [--external | --ingest]
 jpresume validate [--workspace] [--on normalized|repaired]
 jpresume repair [--workspace]
-jpresume generate rirekisho [--workspace] [--provider] [--era] [--external | --ingest]
-jpresume generate shokumukeirekisho [--workspace] [--include-side-projects] [--external | --ingest]
+jpresume generate rirekisho [--workspace] [--provider] [--era] [--target company.json] [--external | --ingest]
+jpresume generate shokumukeirekisho [--workspace] [--include-side-projects] [--era] [--target company.json] [--external | --ingest]
 jpresume render [rirekisho|shokumukeirekisho|both] [--workspace] [--output-dir]
 jpresume inspect [<artifact>] [--workspace] [--json]
 ```
@@ -183,15 +210,13 @@ On parse failure, `--ingest` writes `<stage>.error.json` with the decoder error 
 
 ## Agent skill
 
-The repo ships an [Agent Skill](https://skills.sh) at [`skills/japanese-resume/`](skills/japanese-resume/SKILL.md) that drives the stepwise pipeline in `--external` mode. The agent produces the JSON for the LLM stages (`normalize`, `generate rirekisho`, `generate shokumukeirekisho`) and pauses after `validate` so you can review warnings and hand-edit artifacts before generating output.
+See [Recommended usage](#recommended-usage--agent-skill) at the top of this document.
 
-Install into your agent via the [skills](https://www.npmjs.com/package/skills) CLI:
+The skill lives at [`skills/japanese-resume/`](skills/japanese-resume/SKILL.md). Install with:
 
 ```bash
 npx skills add KristopherGBaker/JPResume
 ```
-
-Works with Claude Code, Cursor, Codex, and other supported agents. See the [skill's SKILL.md](skills/japanese-resume/SKILL.md) for the full contract.
 
 ## Config
 
