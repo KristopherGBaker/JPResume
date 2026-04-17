@@ -29,6 +29,10 @@ targets:
       - package: Yams
       - framework: AppKit
         implicit: true
+      - framework: PDFKit
+        implicit: true
+      - framework: Vision
+        implicit: true
     settings:
       base:
         SWIFT_VERSION: "6.2"

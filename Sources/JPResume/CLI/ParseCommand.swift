@@ -4,10 +4,10 @@ import Foundation
 struct ParseCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "parse",
-        abstract: "Parse a markdown resume into structured JSON (parsed.json, inputs.json)"
+        abstract: "Parse a resume (.md or .pdf) into structured JSON (parsed.json, inputs.json)"
     )
 
-    @Argument(help: "Path to western-style markdown resume")
+    @Argument(help: "Path to western-style resume (.md or .pdf)")
     var input: String
 
     @Option(help: "Workspace directory (default: <input-dir>/.jpresume)")
@@ -34,7 +34,7 @@ struct ParseCommand: AsyncParsableCommand {
         let store = ArtifactStore(root: workspaceURL)
 
         print("Parsing \(inputURL.lastPathComponent)...")
-        let text = try String(contentsOf: inputURL, encoding: .utf8)
+        let text = try await ResumeInputReader.read(from: inputURL)
         let western = Stages.parse(markdown: text)
         print("  Found: \(western.experience.count) work entries, "
               + "\(western.education.count) education entries, "
