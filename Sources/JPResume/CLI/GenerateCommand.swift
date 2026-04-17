@@ -37,6 +37,9 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
     @Flag(help: "Ignore cached output and regenerate")
     var noCache = false
 
+    @Option(help: "Path to target-company context JSON file (enables tailored application mode)")
+    var target: String?
+
     @Flag(help: "Emit rirekisho.prompt.json and exit (external-mode)")
     var external = false
 
@@ -51,6 +54,8 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
         let inputsArtifact = try store.read(.inputs, as: InputsData.self)
         let inputsHash = inputsArtifact.data.markdownHash
 
+        let targetContext = try loadTargetContext(target)
+
         // Strictly require repaired.json
         guard store.status(.repaired) != .missing else {
             print("Error: repaired.json not found. Run 'jpresume repair' first.")
@@ -59,7 +64,8 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
         let repairedArtifact = try store.read(.repaired, as: NormalizedResume.self)
         let repaired = repairedArtifact.data
 
-        let contentHash = ArtifactHashes.rirekisho(inputsHash: inputsHash, era: era)
+        let contentHash = ArtifactHashes.rirekisho(inputsHash: inputsHash, era: era,
+                                                    targetContext: targetContext)
 
         if !noCache, store.status(.rirekisho, expectedContentHash: contentHash) == .fresh {
             let age = store.producedAt(.rirekisho).map { formatAge($0) } ?? "?"
@@ -71,9 +77,12 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
         if external {
             let eraStyle = era == .japanese ? "Japanese era (令和/平成)" : "western year"
             let eraExample = era == .japanese ? "令和2年4月" : "2020年4月"
-            let system = SystemPrompts.rirekisho(eraStyle: eraStyle, eraExample: eraExample)
-            let user = try buildUserMessage(repaired: repaired, config: inputsArtifact.data.config)
-            let opts = ["era": era.rawValue]
+            let system = SystemPrompts.rirekisho(eraStyle: eraStyle, eraExample: eraExample,
+                                                  targetContext: targetContext)
+            let user = try buildUserMessage(repaired: repaired, config: inputsArtifact.data.config,
+                                            targetContext: targetContext)
+            var opts = ["era": era.rawValue]
+            if let t = target { opts["target"] = t }
             try ExternalBridge.emitPrompt(stage: "rirekisho", kind: .rirekisho, workspace: workspaceURL,
                                           sourceArtifacts: ["repaired.json", "inputs.json"],
                                           stageOptions: opts, system: system, user: user, temperature: 0.3)
@@ -100,12 +109,12 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
         }
 
         // Internal LLM call
-        print("Generating 履歴書...")
+        print("Generating 履歴書\(targetContext != nil ? " (targeted)" : "")...")
         let providerInstance = try ProviderFactory.create(provider: provider.rawValue, model: model)
         print("  Using AI provider: \(providerInstance.name)")
         var rirekishoData = try await Stages.generateRirekisho(
             repaired: repaired, config: inputsArtifact.data.config, era: era,
-            provider: providerInstance, verbose: verbose
+            targetContext: targetContext, provider: providerInstance, verbose: verbose
         )
         rirekishoData = Stages.polish(rirekishoData, derived: repaired.derivedExperience)
         try store.write(rirekishoData, kind: .rirekisho, contentHash: contentHash, inputsHash: inputsHash,
@@ -113,12 +122,9 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
         print("  ✓ \(workspaceURL.path)/rirekisho.json")
     }
 
-    private func buildUserMessage(repaired: NormalizedResume, config: JapanConfig) throws -> String {
-        let enc = JSONEncoder(); enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let r = (try? enc.encode(repaired)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-        let c = (try? enc.encode(config)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-        let today = ISO8601DateFormatter().string(from: Date()).prefix(10)
-        return "{\n  \"normalized_resume\": \(r),\n  \"japan_config\": \(c),\n  \"today\": \"\(today)\"\n}"
+    private func buildUserMessage(repaired: NormalizedResume, config: JapanConfig,
+                                   targetContext: TargetCompanyContext?) throws -> String {
+        buildTargetUserMessage(repaired: repaired, config: config, targetContext: targetContext)
     }
 }
 
@@ -154,6 +160,9 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
     @Flag(help: "Exclude older irrelevant roles")
     var excludeOlderRoles = false
 
+    @Option(help: "Path to target-company context JSON file (enables tailored application mode)")
+    var target: String?
+
     @Flag(help: "Emit shokumukeirekisho.prompt.json and exit (external-mode)")
     var external = false
 
@@ -168,6 +177,8 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
         let inputsArtifact = try store.read(.inputs, as: InputsData.self)
         let inputsHash = inputsArtifact.data.markdownHash
 
+        let targetContext = try loadTargetContext(target)
+
         guard store.status(.repaired) != .missing else {
             print("Error: repaired.json not found. Run 'jpresume repair' first.")
             throw ExitCode.failure
@@ -178,7 +189,8 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
             includeSideProjects: includeSideProjects,
             includeOlderIrrelevantRoles: !excludeOlderRoles
         )
-        let contentHash = ArtifactHashes.shokumukeirekisho(inputsHash: inputsHash, era: era, options: genOptions)
+        let contentHash = ArtifactHashes.shokumukeirekisho(inputsHash: inputsHash, era: era,
+                                                            options: genOptions, targetContext: targetContext)
 
         if !noCache, store.status(.shokumukeirekisho, expectedContentHash: contentHash) == .fresh {
             let age = store.producedAt(.shokumukeirekisho).map { formatAge($0) } ?? "?"
@@ -189,13 +201,16 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
 
         if external {
             let eraStyle = era == .japanese ? "Japanese era (令和/平成)" : "western year"
-            let system = SystemPrompts.shokumukeirekisho(eraStyle: eraStyle, options: genOptions)
-            let user = try buildUserMessage(repaired: repaired, config: inputsArtifact.data.config)
-            let opts = [
+            let system = SystemPrompts.shokumukeirekisho(eraStyle: eraStyle, options: genOptions,
+                                                          targetContext: targetContext)
+            let user = try buildUserMessage(repaired: repaired, config: inputsArtifact.data.config,
+                                            targetContext: targetContext)
+            var opts = [
                 "era": era.rawValue,
                 "include_side_projects": String(includeSideProjects),
                 "include_older_irrelevant_roles": String(!excludeOlderRoles)
             ]
+            if let t = target { opts["target"] = t }
             try ExternalBridge.emitPrompt(stage: "shokumukeirekisho", kind: .shokumukeirekisho,
                                           workspace: workspaceURL,
                                           sourceArtifacts: ["repaired.json", "inputs.json"],
@@ -223,12 +238,12 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
         }
 
         // Internal LLM call
-        print("Generating 職務経歴書...")
+        print("Generating 職務経歴書\(targetContext != nil ? " (targeted)" : "")...")
         let providerInstance = try ProviderFactory.create(provider: provider.rawValue, model: model)
         print("  Using AI provider: \(providerInstance.name)")
         var shokumuData = try await Stages.generateShokumukeirekisho(
             repaired: repaired, config: inputsArtifact.data.config, era: era,
-            options: genOptions, provider: providerInstance, verbose: verbose
+            options: genOptions, targetContext: targetContext, provider: providerInstance, verbose: verbose
         )
         shokumuData = Stages.polish(shokumuData, derived: repaired.derivedExperience)
         try store.write(shokumuData, kind: .shokumukeirekisho, contentHash: contentHash, inputsHash: inputsHash,
@@ -236,11 +251,37 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
         print("  ✓ \(workspaceURL.path)/shokumukeirekisho.json")
     }
 
-    private func buildUserMessage(repaired: NormalizedResume, config: JapanConfig) throws -> String {
-        let enc = JSONEncoder(); enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let r = (try? enc.encode(repaired)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-        let c = (try? enc.encode(config)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-        let today = ISO8601DateFormatter().string(from: Date()).prefix(10)
-        return "{\n  \"normalized_resume\": \(r),\n  \"japan_config\": \(c),\n  \"today\": \"\(today)\"\n}"
+    private func buildUserMessage(repaired: NormalizedResume, config: JapanConfig,
+                                   targetContext: TargetCompanyContext?) throws -> String {
+        buildTargetUserMessage(repaired: repaired, config: config, targetContext: targetContext)
     }
+}
+
+// MARK: - Shared helpers
+
+func loadTargetContext(_ path: String?) throws -> TargetCompanyContext? {
+    guard let path else { return nil }
+    let url = URL(fileURLWithPath: path)
+    guard FileManager.default.fileExists(atPath: url.path) else {
+        print("Error: target context file not found: \(path)")
+        throw ExitCode.failure
+    }
+    let data = try Data(contentsOf: url)
+    return try JSONDecoder().decode(TargetCompanyContext.self, from: data)
+}
+
+func buildTargetUserMessage(repaired: NormalizedResume, config: JapanConfig,
+                             targetContext: TargetCompanyContext?) -> String {
+    let enc = JSONEncoder(); enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+    let r = (try? enc.encode(repaired)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+    let c = (try? enc.encode(config)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+    let today = ISO8601DateFormatter().string(from: Date()).prefix(10)
+    var msg = "{\n  \"normalized_resume\": \(r),\n  \"japan_config\": \(c),\n  \"today\": \"\(today)\""
+    if let ctx = targetContext,
+       let ctxData = try? enc.encode(ctx),
+       let ctxStr = String(data: ctxData, encoding: .utf8) {
+        msg += ",\n  \"target_company_context\": \(ctxStr)"
+    }
+    msg += "\n}"
+    return msg
 }

@@ -89,17 +89,23 @@ enum ArtifactHashes {
         AICache.contentHash(markdownContent: markdownContent, configData: configData)
     }
 
-    /// Rirekisho hash includes era style so era changes invalidate the cache.
-    static func rirekisho(inputsHash: String, era: EraStyle) -> String {
-        sha256("\(inputsHash)\(era.rawValue)")
+    /// Rirekisho hash includes era style and optional target context.
+    static func rirekisho(inputsHash: String, era: EraStyle,
+                          targetContext: TargetCompanyContext? = nil) -> String {
+        let enc = JSONEncoder(); enc.outputFormatting = [.sortedKeys]
+        let ctxStr = targetContext.flatMap { try? enc.encode($0) }
+            .flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        return sha256("\(inputsHash)\(era.rawValue)\(ctxStr)")
     }
 
-    /// Shokumukeirekisho hash also includes generation options, fixing a bug
-    /// where --include-side-projects didn't invalidate the cache.
-    static func shokumukeirekisho(inputsHash: String, era: EraStyle, options: GenerationOptions) -> String {
+    /// Shokumukeirekisho hash includes generation options and optional target context.
+    static func shokumukeirekisho(inputsHash: String, era: EraStyle, options: GenerationOptions,
+                                  targetContext: TargetCompanyContext? = nil) -> String {
         let enc = JSONEncoder(); enc.outputFormatting = [.sortedKeys]
         let optStr = (try? enc.encode(options)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
-        return sha256("\(inputsHash)\(era.rawValue)\(optStr)")
+        let ctxStr = targetContext.flatMap { try? enc.encode($0) }
+            .flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        return sha256("\(inputsHash)\(era.rawValue)\(optStr)\(ctxStr)")
     }
 
     private static func sha256(_ string: String) -> String {

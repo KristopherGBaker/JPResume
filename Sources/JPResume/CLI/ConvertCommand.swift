@@ -58,6 +58,9 @@ struct ConvertCommand: AsyncParsableCommand {
     @Flag(help: "Exclude older irrelevant roles from 職務経歴書")
     var excludeOlderRoles = false
 
+    @Option(help: "Path to target-company context JSON file (enables tailored application mode)")
+    var target: String?
+
     func run() async throws {
         let inputURL = URL(fileURLWithPath: input)
         guard FileManager.default.fileExists(atPath: inputURL.path) else {
@@ -142,13 +145,17 @@ struct ConvertCommand: AsyncParsableCommand {
             includeSideProjects: includeSideProjects,
             includeOlderIrrelevantRoles: !excludeOlderRoles
         )
-        let rHash = ArtifactHashes.rirekisho(inputsHash: inputsHash, era: era)
-        let sHash = ArtifactHashes.shokumukeirekisho(inputsHash: inputsHash, era: era, options: genOptions)
+        let targetContext = try loadTargetContext(target)
+        let rHash = ArtifactHashes.rirekisho(inputsHash: inputsHash, era: era,
+                                              targetContext: targetContext)
+        let sHash = ArtifactHashes.shokumukeirekisho(inputsHash: inputsHash, era: era,
+                                                      options: genOptions, targetContext: targetContext)
 
-        print("\nStep 5: Translating and adapting with AI...")
+        print("\nStep 5: Translating and adapting with AI\(targetContext != nil ? " (targeted)" : "")...")
         let (rirekishoData, shokumukeirekishoData) = try await resolveJPData(
             store: store, repaired: repaired, config: japanConfig, genOptions: genOptions,
-            inputsHash: inputsHash, rirekishoHash: rHash, shokumuHash: sHash, producedBy: by
+            targetContext: targetContext, inputsHash: inputsHash, rirekishoHash: rHash,
+            shokumuHash: sHash, producedBy: by
         )
 
         // Step 5b: Polish
@@ -212,6 +219,7 @@ extension ConvertCommand {
         repaired: NormalizedResume,
         config: JapanConfig,
         genOptions: GenerationOptions,
+        targetContext: TargetCompanyContext?,
         inputsHash: String,
         rirekishoHash: String,
         shokumuHash: String,
@@ -262,7 +270,7 @@ extension ConvertCommand {
             if generateR && rirekishoData == nil {
                 print("  Generating 履歴書...")
                 rirekishoData = try await Stages.generateRirekisho(
-                    repaired: repaired, config: config, era: era,
+                    repaired: repaired, config: config, era: era, targetContext: targetContext,
                     provider: providerInstance, verbose: verbose
                 )
             }
@@ -270,7 +278,7 @@ extension ConvertCommand {
                 print("  Generating 職務経歴書...")
                 shokumuData = try await Stages.generateShokumukeirekisho(
                     repaired: repaired, config: config, era: era, options: genOptions,
-                    provider: providerInstance, verbose: verbose
+                    targetContext: targetContext, provider: providerInstance, verbose: verbose
                 )
             }
         }
