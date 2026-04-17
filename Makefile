@@ -7,10 +7,10 @@ test:
 	swift test
 
 lint:
-	swiftlint lint
+	mint run swiftlint lint
 
 fix:
-	swiftlint lint --fix
+	mint run swiftlint lint --fix
 
 clean:
 	swift package clean
