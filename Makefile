@@ -1,4 +1,4 @@
-.PHONY: build test lint fix clean project install bootstrap
+.PHONY: build test lint fix clean project install bootstrap bump-patch bump-minor bump-major
 
 build:
 	swift build
@@ -25,3 +25,12 @@ install:
 
 bootstrap:
 	mint bootstrap
+
+bump-patch:
+	python3 Scripts/bump_version.py --part patch
+
+bump-minor:
+	python3 Scripts/bump_version.py --part minor
+
+bump-major:
+	python3 Scripts/bump_version.py --part major

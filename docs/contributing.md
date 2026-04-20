@@ -44,4 +44,6 @@ Releases are tagged `v*` and published to [GitHub Releases](https://github.com/K
 To cut a release:
 
 1. Run `python3 Scripts/bump_version.py X.Y.Z`
+   Or use `python3 Scripts/bump_version.py --part patch|minor|major`
+   Or use `make bump-patch`, `make bump-minor`, or `make bump-major`
 2. Review the diff, commit it, then tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`
