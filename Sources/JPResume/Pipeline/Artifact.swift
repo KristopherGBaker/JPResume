@@ -71,6 +71,7 @@ struct ArtifactSummary: Sendable {
 
 enum ResumeSourceKind: String, Codable, Sendable {
     case markdown
+    case docx
     case pdf
     case text
 
@@ -78,6 +79,8 @@ enum ResumeSourceKind: String, Codable, Sendable {
         switch url.pathExtension.lowercased() {
         case "md", "markdown":
             return .markdown
+        case "docx":
+            return .docx
         case "pdf":
             return .pdf
         default:

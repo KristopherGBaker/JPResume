@@ -4,10 +4,10 @@ import Foundation
 struct ParseCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "parse",
-        abstract: "Parse a resume (.md or .pdf) into structured JSON (parsed.json, inputs.json)"
+        abstract: "Parse a resume (.md, .docx, or .pdf) into structured JSON (parsed.json, inputs.json)"
     )
 
-    @Argument(help: "Path to western-style resume (.md or .pdf)")
+    @Argument(help: "Path to western-style resume (.md, .docx, or .pdf)")
     var input: String
 
     @Option(help: "Workspace directory (default: <input-dir>/.jpresume)")

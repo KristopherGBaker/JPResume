@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-JPResume is a Swift CLI tool that converts western-style resumes (.md or .pdf) to Japanese format (履歴書 rirekisho and 職務経歴書 shokumukeirekisho). It uses CoreGraphics for native PDF rendering with Japanese fonts (Hiragino Sans).
+JPResume is a Swift CLI tool that converts western-style resumes (.md, .docx, or .pdf) to Japanese format (履歴書 rirekisho and 職務経歴書 shokumukeirekisho). It uses CoreGraphics for native PDF rendering with Japanese fonts (Hiragino Sans).
 
 ## Build & Test Commands
 
 ```bash
 make build                     # swift build
-make test                      # swift test (148 tests, 13 suites)
+make test                      # swift test (155 tests, 13 suites)
 make lint                      # swiftlint lint
 make fix                       # swiftlint lint --fix
 make project                   # xcodegen generate
@@ -25,7 +25,7 @@ swift run jpresume convert examples/Kristopher_Baker_Resume.md --provider claude
 
 Two orchestration modes share the same underlying pipeline:
 
-- **`convert <input.md|.pdf>`** — one-shot end-to-end run (unchanged behavior).
+- **`convert <input.md|.docx|.pdf>`** — one-shot end-to-end run (unchanged behavior).
 - **Stepwise subcommands** — `parse`, `normalize`, `validate`, `repair`, `generate
   rirekisho`, `generate shokumukeirekisho`, `render`, `inspect`. Each reads / writes
   artifacts inside a workspace so humans or agents can pause, review, and resume
@@ -44,10 +44,10 @@ application mode (adjusts 志望動機, 職務要約, 自己PR, role/achievement
 
 Pipeline: **Parse → Normalize → Validate → Adapt → Render**
 
-1. **Input reading** (`Sources/JPResume/Parser/ResumeInputReader.swift`) accepts `.md` or `.pdf`. For PDFs, `PDFKit` text extraction is attempted first; if the result is under 100 characters (scanned/image PDF), `Vision` OCR is used as fallback.
+1. **Input reading** (`Sources/JPResume/Parser/ResumeInputReader.swift`) accepts `.md`, `.docx`, or `.pdf`. DOCX is read through `SwiftDocX`. For PDFs, `PDFKit` text extraction is attempted first; if the result is under 100 characters (scanned/image PDF), `Vision` OCR is used as fallback.
    **Source-aware parsing** then branches by input kind:
    - markdown uses `Sources/JPResume/Parser/MarkdownParser.swift`
-   - PDF/plain text uses `Sources/JPResume/Parser/ResumeTextPreprocessor.swift` and `Sources/JPResume/Parser/PlainTextResumeParser.swift`
+   - DOCX/PDF/plain text uses `Sources/JPResume/Parser/ResumeTextPreprocessor.swift` and `Sources/JPResume/Parser/PlainTextResumeParser.swift`
    The resulting `WesternResume` is advisory for non-markdown inputs; normalization also receives cleaned source text from `inputs.json`.
 2. **Config** (`Sources/JPResume/Config/`) loads `jpresume_config.yaml` (Japan-specific fields: kanji name, furigana, education dates, work history) or prompts interactively, then saves for reuse via Yams.
 3. **Normalize** (`Sources/JPResume/AI/ResumeNormalizer.swift`) sends `WesternResume` + `JapanConfig` + source input metadata (`source_kind`, cleaned source text, preprocessing notes) to LLM, returns `NormalizedResume` with structured dates, classified bullets (achievement vs responsibility), and categorized skills. Falls back to deterministic parsing if LLM fails. Cached to `.normalized_cache.json`.
@@ -57,7 +57,7 @@ Pipeline: **Parse → Normalize → Validate → Adapt → Render**
 
 ### Intermediate Models
 
-- `WesternResume` — raw parsed output from the deterministic parser layer. Dates are strings, bullets are flat. For PDF/plain-text input it is advisory rather than exhaustive.
+- `WesternResume` — raw parsed output from the deterministic parser layer. Dates are strings, bullets are flat. For DOCX/PDF/plain-text input it is advisory rather than exhaustive.
 - `NormalizedResume` — canonical intermediate produced by `ResumeNormalizer`. Contains `StructuredDate` (year/month ints), `NormalizedBullet` (with `.responsibility`/`.achievement` classification), `SkillCategory` groups, and per-entry `confidence` scores.
 - `TargetCompanyContext` (`Sources/JPResume/Models/TargetCompanyContext.swift`) — optional tailoring layer. Fields: `company_name`, `role_title`, `company_summary`, `job_description_excerpt`, `normalized_requirements`, `emphasis_tags`, `candidate_interest_notes`. All optional. Loaded from a JSON file via `--target`; folded into `ArtifactHashes` so the cache is invalidated when the file changes.
 

@@ -59,6 +59,16 @@ struct ResumeInputReaderTests {
         #expect(text.contains("Jane Doe"))
     }
 
+    @Test func readsDOCXFile() async throws {
+        let url = try makeDOCX(content: richContent)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let text = try await ResumeInputReader.read(from: url)
+        #expect(text.contains("Jane Doe"))
+        #expect(text.contains("Software Engineer"))
+        #expect(text.contains("Swift and Go"))
+    }
+
     // MARK: - Text-layer PDF (PDFKit text extraction, no OCR)
 
     @Test func readsTextLayerPDF() async throws {
@@ -134,12 +144,93 @@ struct ResumeInputReaderTests {
         #expect(resume.skills.contains("SwiftUI"))
         #expect(resume.rawSections["Projects"]?.contains("AI Mock Interview Coach") == true)
     }
+
+    @Test func parsesResumeDOCXIntoStructuredResume() async throws {
+        let url = try makeDOCX(content: parsedResumeContent)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let text = try await ResumeInputReader.read(from: url)
+        let preprocessed = ResumeTextPreprocessor.preprocess(text, sourceKind: .docx)
+        let resume = Stages.parse(text: preprocessed.cleanedText, sourceKind: .docx)
+
+        #expect(resume.name == "JORDAN EXAMPLE")
+        #expect(resume.experience.count == 3)
+        #expect(resume.experience[0].company == "Northstar / Atlas")
+        #expect(resume.education.count == 1)
+        #expect(resume.skills.contains("Swift"))
+        #expect(resume.rawSections["Projects"]?.contains("AI Mock Interview Coach") == true)
+    }
 }
 
 // MARK: - PDF fixture helpers
 
 extension ResumeInputReaderTests {
     private struct SetupError: Error { let message: String }
+
+    private func makeDOCX(content: String) throws -> URL {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("jpresume_test_docx_\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+
+        let relsDir = tempDir.appendingPathComponent("_rels", isDirectory: true)
+        let wordDir = tempDir.appendingPathComponent("word", isDirectory: true)
+        let wordRelsDir = wordDir.appendingPathComponent("_rels", isDirectory: true)
+        try FileManager.default.createDirectory(at: relsDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: wordDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: wordRelsDir, withIntermediateDirectories: true)
+
+        try """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+          <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+          <Default Extension="xml" ContentType="application/xml"/>
+          <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+        </Types>
+        """.write(to: tempDir.appendingPathComponent("[Content_Types].xml"), atomically: true, encoding: .utf8)
+
+        try """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+          <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+        </Relationships>
+        """.write(to: relsDir.appendingPathComponent(".rels"), atomically: true, encoding: .utf8)
+
+        let paragraphs = content
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { line -> String in
+                let escaped = xmlEscaped(String(line))
+                if escaped.isEmpty {
+                    return "<w:p/>"
+                }
+                return """
+                <w:p>
+                  <w:r><w:t xml:space="preserve">\(escaped)</w:t></w:r>
+                </w:p>
+                """
+            }
+            .joined(separator: "\n")
+
+        try """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <w:body>
+            \(paragraphs)
+            <w:sectPr/>
+          </w:body>
+        </w:document>
+        """.write(to: wordDir.appendingPathComponent("document.xml"), atomically: true, encoding: .utf8)
+
+        try """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>
+        """.write(to: wordRelsDir.appendingPathComponent("document.xml.rels"), atomically: true, encoding: .utf8)
+
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("jpresume_test_docx_\(UUID().uuidString).docx")
+        try zipDirectory(source: tempDir, destination: outputURL)
+        try FileManager.default.removeItem(at: tempDir)
+        return outputURL
+    }
 
     /// Creates a searchable (text-layer) PDF and returns a temp URL.
     private func makeTextLayerPDF(content: String) throws -> URL {
@@ -205,5 +296,25 @@ extension ResumeInputReaderTests {
             .appendingPathComponent("jpresume_test_image_\(UUID().uuidString).pdf")
         try (data as Data).write(to: url)
         return url
+    }
+
+    private func zipDirectory(source: URL, destination: URL) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        process.arguments = ["-qr", destination.path, "."]
+        process.currentDirectoryURL = source
+        try process.run()
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            throw SetupError(message: "zip failed with status \(process.terminationStatus)")
+        }
+    }
+
+    private func xmlEscaped(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
     }
 }

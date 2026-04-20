@@ -7,7 +7,7 @@ struct ConvertCommand: AsyncParsableCommand {
         abstract: "Convert a western resume to Japanese format (one-shot)"
     )
 
-    @Argument(help: "Path to western-style resume (.md or .pdf)")
+    @Argument(help: "Path to western-style resume (.md, .docx, or .pdf)")
     var input: String
 
     @Option(name: [.short, .long], help: "Output directory (default: same as input)")

@@ -1,15 +1,18 @@
 import AppKit
 import Foundation
 import PDFKit
+import SwiftDocX
 import Vision
 
 enum ResumeInputReader {
     enum Error: Swift.Error, LocalizedError {
+        case cannotOpenDOCX(URL)
         case cannotOpenPDF(URL)
         case noExtractableText(URL)
 
         var errorDescription: String? {
             switch self {
+            case .cannotOpenDOCX(let url): return "Cannot open DOCX: \(url.lastPathComponent)"
             case .cannotOpenPDF(let url): return "Cannot open PDF: \(url.lastPathComponent)"
             case .noExtractableText(let url): return "No extractable text found in: \(url.lastPathComponent)"
             }
@@ -20,10 +23,33 @@ enum ResumeInputReader {
     private static let textLayerThreshold = 100
 
     static func read(from url: URL) async throws -> String {
-        guard url.pathExtension.lowercased() == "pdf" else {
+        switch url.pathExtension.lowercased() {
+        case "pdf":
+            return try await extractFromPDF(url)
+        case "docx":
+            return try extractFromDOCX(url)
+        default:
             return try String(contentsOf: url, encoding: .utf8)
         }
-        return try await extractFromPDF(url)
+    }
+
+    // MARK: - DOCX extraction
+
+    private static func extractFromDOCX(_ url: URL) throws -> String {
+        guard let document = try? Document(contentsOf: url) else {
+            throw Error.cannotOpenDOCX(url)
+        }
+
+        let text = document.text
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { String($0).trimmingCharacters(in: CharacterSet.whitespacesAndNewlines) }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+
+        guard !text.isEmpty else {
+            throw Error.noExtractableText(url)
+        }
+        return text
     }
 
     // MARK: - PDF extraction
