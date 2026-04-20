@@ -2,12 +2,8 @@ import Foundation
 
 // MARK: - Validation types
 
-enum ValidationSeverity: String, Codable, Sendable {
-    case info, warning, error
-}
-
 struct ValidationIssue: Codable, Sendable {
-    let severity: ValidationSeverity
+    let severity: Severity
     let field: String
     let message: String
 }
@@ -35,7 +31,7 @@ struct ValidationResult: Codable, Sendable {
 
 extension ValidationIssue {
     var asArtifactWarning: ArtifactWarning {
-        ArtifactWarning(severity: severity.rawValue, field: field, message: message)
+        ArtifactWarning(severity: severity, field: field, message: message)
     }
 }
 

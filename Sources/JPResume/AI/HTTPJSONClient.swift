@@ -18,13 +18,28 @@ enum HTTPJSONClient {
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            throw AIProviderError.requestFailed("transport error contacting \(url.host ?? url.absoluteString)",
+                                                underlying: error)
+        }
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw AIProviderError.requestFailed(String(data: data, encoding: .utf8) ?? "Unknown error")
+            let status = (response as? HTTPURLResponse).map { "HTTP \($0.statusCode)" } ?? "non-HTTP response"
+            let bodyText = String(data: data, encoding: .utf8) ?? "<unreadable body>"
+            throw AIProviderError.requestFailed("\(status): \(bodyText)")
         }
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw AIProviderError.invalidResponse("Response was not a JSON object")
+        do {
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw AIProviderError.invalidResponse("Response was not a JSON object")
+            }
+            return json
+        } catch let error as AIProviderError {
+            throw error
+        } catch {
+            throw AIProviderError.requestFailed("response was not valid JSON", underlying: error)
         }
-        return json
     }
 }

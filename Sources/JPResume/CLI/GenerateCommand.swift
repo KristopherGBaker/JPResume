@@ -79,8 +79,8 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
             let eraExample = era == .japanese ? "令和2年4月" : "2020年4月"
             let system = SystemPrompts.rirekisho(eraStyle: eraStyle, eraExample: eraExample,
                                                   targetContext: targetContext)
-            let user = try buildUserMessage(repaired: repaired, config: inputsArtifact.data.config,
-                                            targetContext: targetContext)
+            let user = try PromptPayload.adapt(normalized: repaired, config: inputsArtifact.data.config,
+                                               targetContext: targetContext)
             var opts = ["era": era.rawValue]
             if let t = target { opts["target"] = t }
             try ExternalBridge.emitPrompt(stage: "rirekisho", kind: .rirekisho, workspace: workspaceURL,
@@ -120,12 +120,6 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
         try store.write(rirekishoData, kind: .rirekisho, contentHash: contentHash, inputsHash: inputsHash,
                         producedBy: ProducedBy.jpresume(providerSlug: provider.rawValue, modelOverride: model))
         print("  ✓ \(workspaceURL.path)/rirekisho.json")
-    }
-
-    private func buildUserMessage(repaired: NormalizedResume,
-                                  config: JapanConfig,
-                                  targetContext: TargetCompanyContext?) throws -> String {
-        buildTargetUserMessage(repaired: repaired, config: config, targetContext: targetContext)
     }
 }
 
@@ -204,8 +198,8 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
             let eraStyle = era == .japanese ? "Japanese era (令和/平成)" : "western year"
             let system = SystemPrompts.shokumukeirekisho(eraStyle: eraStyle, options: genOptions,
                                                           targetContext: targetContext)
-            let user = try buildUserMessage(repaired: repaired, config: inputsArtifact.data.config,
-                                            targetContext: targetContext)
+            let user = try PromptPayload.adapt(normalized: repaired, config: inputsArtifact.data.config,
+                                               targetContext: targetContext)
             var opts = [
                 "era": era.rawValue,
                 "include_side_projects": String(includeSideProjects),
@@ -251,12 +245,6 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
                         producedBy: ProducedBy.jpresume(providerSlug: provider.rawValue, modelOverride: model))
         print("  ✓ \(workspaceURL.path)/shokumukeirekisho.json")
     }
-
-    private func buildUserMessage(repaired: NormalizedResume,
-                                  config: JapanConfig,
-                                  targetContext: TargetCompanyContext?) throws -> String {
-        buildTargetUserMessage(repaired: repaired, config: config, targetContext: targetContext)
-    }
 }
 
 // MARK: - Shared helpers
@@ -270,21 +258,4 @@ func loadTargetContext(_ path: String?) throws -> TargetCompanyContext? {
     }
     let data = try Data(contentsOf: url)
     return try JSONDecoder().decode(TargetCompanyContext.self, from: data)
-}
-
-func buildTargetUserMessage(repaired: NormalizedResume,
-                            config: JapanConfig,
-                            targetContext: TargetCompanyContext?) -> String {
-    let enc = JSONCoders.prettySorted
-    let r = (try? enc.encode(repaired)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-    let c = (try? enc.encode(config)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-    let today = ISO8601DateFormatter().string(from: Date()).prefix(10)
-    var msg = "{\n  \"normalized_resume\": \(r),\n  \"japan_config\": \(c),\n  \"today\": \"\(today)\""
-    if let ctx = targetContext,
-       let ctxData = try? enc.encode(ctx),
-       let ctxStr = String(data: ctxData, encoding: .utf8) {
-        msg += ",\n  \"target_company_context\": \(ctxStr)"
-    }
-    msg += "\n}"
-    return msg
 }

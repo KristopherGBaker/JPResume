@@ -143,10 +143,9 @@ struct ArtifactStore: Sendable {
                 producedBy = meta.producedBy
                 for w in meta.warnings {
                     switch w.severity {
-                    case "info":    infoCount += 1
-                    case "warning": warnCount += 1
-                    case "error":   errCount += 1
-                    default: break
+                    case .info:    infoCount += 1
+                    case .warning: warnCount += 1
+                    case .error:   errCount += 1
                     }
                 }
             }

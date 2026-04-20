@@ -13,7 +13,7 @@ extension AIProvider {
 
 enum AIProviderError: Error, LocalizedError {
     case missingAPIKey(String)
-    case requestFailed(String)
+    case requestFailed(String, underlying: Error? = nil)
     case invalidResponse(String)
     case jsonExtractionFailed(String)
 
@@ -21,7 +21,10 @@ enum AIProviderError: Error, LocalizedError {
         switch self {
         case .missingAPIKey(let key):
             return "\(key) environment variable is required"
-        case .requestFailed(let msg):
+        case .requestFailed(let msg, let underlying):
+            if let underlying {
+                return "API request failed: \(msg) (\(underlying.localizedDescription))"
+            }
             return "API request failed: \(msg)"
         case .invalidResponse(let msg):
             return "Invalid response: \(msg)"
