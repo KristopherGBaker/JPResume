@@ -164,6 +164,10 @@ struct ResumeInputReaderTests {
     }
 
     @Test func readsDOCXPreservingSoftBreaksAndListParagraphs() async throws {
+        let degreeRunXML =
+            #"<w:r><w:t xml:space="preserve">Bachelor of Science, Computer Science  |  Minor: Mathematics</w:t>"#
+            + #"<w:br w:type="textWrapping"/>"#
+            + #"<w:t xml:space="preserve">Summa Cum Laude</w:t></w:r>"#
         let documentXML = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
         <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
@@ -183,7 +187,7 @@ struct ResumeInputReaderTests {
               <w:r><w:t xml:space="preserve">  Senior Software Engineer</w:t></w:r>
             </w:p>
             <w:p>
-              <w:r><w:t xml:space="preserve">Bachelor of Science, Computer Science  |  Minor: Mathematics</w:t><w:br w:type="textWrapping"/><w:t xml:space="preserve">Summa Cum Laude</w:t></w:r>
+              \(degreeRunXML)
             </w:p>
             <w:sectPr/>
           </w:body>

@@ -59,9 +59,7 @@ enum ExternalBridge {
             responsePath: responsePath
         )
 
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(bundle)
+        let data = try JSONCoders.prettySorted.encode(bundle)
 
         try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
         let promptURL = workspace.appendingPathComponent("\(stage).prompt.json")
@@ -93,9 +91,7 @@ enum ExternalBridge {
 
     /// Write a structured error file when --ingest fails.
     static func writeError(_ error: ErrorBundle, stage: String, workspace: URL) throws {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(error)
+        let data = try JSONCoders.prettySorted.encode(error)
         let url = workspace.appendingPathComponent("\(stage).error.json")
         try data.write(to: url)
         print("  Error written to \(url.path)")

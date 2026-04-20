@@ -275,7 +275,7 @@ func loadTargetContext(_ path: String?) throws -> TargetCompanyContext? {
 func buildTargetUserMessage(repaired: NormalizedResume,
                             config: JapanConfig,
                             targetContext: TargetCompanyContext?) -> String {
-    let enc = JSONEncoder(); enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+    let enc = JSONCoders.prettySorted
     let r = (try? enc.encode(repaired)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
     let c = (try? enc.encode(config)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
     let today = ISO8601DateFormatter().string(from: Date()).prefix(10)

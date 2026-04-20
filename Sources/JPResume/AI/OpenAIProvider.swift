@@ -20,12 +20,6 @@ struct OpenAIProvider: AIProvider, Sendable {
     }
 
     func chat(system: String, user: String, temperature: Double) async throws -> String {
-        let url = URL(string: "\(baseURL)/chat/completions")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-
         let body: [String: Any] = [
             "model": model,
             "temperature": temperature,
@@ -34,15 +28,12 @@ struct OpenAIProvider: AIProvider, Sendable {
                 ["role": "user", "content": user],
             ],
         ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw AIProviderError.requestFailed(String(data: data, encoding: .utf8) ?? "Unknown error")
-        }
-
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let choices = json?["choices"] as? [[String: Any]]
+        let json = try await HTTPJSONClient.postJSON(
+            url: URL(string: "\(baseURL)/chat/completions")!,
+            headers: ["Authorization": "Bearer \(apiKey)"],
+            body: body
+        )
+        let choices = json["choices"] as? [[String: Any]]
         let message = choices?.first?["message"] as? [String: Any]
         guard let content = message?["content"] as? String else {
             throw AIProviderError.invalidResponse("No content in response")

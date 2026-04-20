@@ -68,8 +68,7 @@ struct ResumeAI: Sendable {
         config: JapanConfig,
         targetContext: TargetCompanyContext? = nil
     ) throws -> String {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let encoder = JSONCoders.prettySorted
         let normalizedJSON = try encoder.encode(normalized)
         let configJSON = try encoder.encode(config)
 

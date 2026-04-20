@@ -149,7 +149,7 @@ enum ArtifactHashes {
     /// Rirekisho hash includes era style and optional target context.
     static func rirekisho(inputsHash: String, era: EraStyle,
                           targetContext: TargetCompanyContext? = nil) -> String {
-        let enc = JSONEncoder(); enc.outputFormatting = [.sortedKeys]
+        let enc = JSONCoders.sorted
         let ctxStr = targetContext.flatMap { try? enc.encode($0) }
             .flatMap { String(data: $0, encoding: .utf8) } ?? ""
         return sha256("\(inputsHash)\(era.rawValue)\(ctxStr)")
@@ -158,7 +158,7 @@ enum ArtifactHashes {
     /// Shokumukeirekisho hash includes generation options and optional target context.
     static func shokumukeirekisho(inputsHash: String, era: EraStyle, options: GenerationOptions,
                                   targetContext: TargetCompanyContext? = nil) -> String {
-        let enc = JSONEncoder(); enc.outputFormatting = [.sortedKeys]
+        let enc = JSONCoders.sorted
         let optStr = (try? enc.encode(options)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
         let ctxStr = targetContext.flatMap { try? enc.encode($0) }
             .flatMap { String(data: $0, encoding: .utf8) } ?? ""

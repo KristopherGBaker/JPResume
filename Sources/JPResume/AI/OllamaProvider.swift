@@ -12,11 +12,6 @@ struct OllamaProvider: AIProvider, Sendable {
     }
 
     func chat(system: String, user: String, temperature: Double) async throws -> String {
-        let url = URL(string: "\(baseURL)/api/chat")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
         let body: [String: Any] = [
             "model": model,
             "stream": false,
@@ -26,15 +21,11 @@ struct OllamaProvider: AIProvider, Sendable {
                 ["role": "user", "content": user],
             ],
         ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw AIProviderError.requestFailed(String(data: data, encoding: .utf8) ?? "Unknown error")
-        }
-
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let message = json?["message"] as? [String: Any]
+        let json = try await HTTPJSONClient.postJSON(
+            url: URL(string: "\(baseURL)/api/chat")!,
+            body: body
+        )
+        let message = json["message"] as? [String: Any]
         guard let content = message?["content"] as? String else {
             throw AIProviderError.invalidResponse("No content in response")
         }

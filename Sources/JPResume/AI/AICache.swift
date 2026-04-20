@@ -58,9 +58,7 @@ enum AICache {
             cachedAt: ISO8601DateFormatter().string(from: Date()),
             data: value
         )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(envelope)
+        let data = try JSONCoders.prettySorted.encode(envelope)
         try data.write(to: url)
         print("  Cached to \(url.lastPathComponent)")
     }
