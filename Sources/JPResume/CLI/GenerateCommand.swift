@@ -90,21 +90,12 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
         }
 
         if ingest {
-            let raw = try ExternalBridge.readResponse(stage: "rirekisho", workspace: workspaceURL)
-            do {
-                let jsonData = try JSONExtractor.extract(from: raw)
-                var data = try JSONDecoder().decode(RirekishoData.self, from: jsonData)
-                data = Stages.polish(data, derived: repaired.derivedExperience)
-                let by = ProducedBy.external(model: model ?? "external")
-                try store.write(data, kind: .rirekisho, contentHash: contentHash, inputsHash: inputsHash,
-                                producedBy: by, mode: "external")
-                print("  ✓ Ingested rirekisho.json")
-            } catch {
-                let bundle = ErrorBundle(stage: "rirekisho", error: error.localizedDescription,
-                                         responsePath: workspaceURL.appendingPathComponent("rirekisho.response.json").path)
-                try? ExternalBridge.writeError(bundle, stage: "rirekisho", workspace: workspaceURL)
-                throw error
-            }
+            try ExternalBridge.ingestResponse(
+                stage: "rirekisho", kind: .rirekisho,
+                workspace: workspaceURL, store: store,
+                contentHash: contentHash, inputsHash: inputsHash, model: model,
+                as: RirekishoData.self
+            ) { Stages.polish($0, derived: repaired.derivedExperience) }
             return
         }
 
@@ -214,21 +205,12 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
         }
 
         if ingest {
-            let raw = try ExternalBridge.readResponse(stage: "shokumukeirekisho", workspace: workspaceURL)
-            do {
-                let jsonData = try JSONExtractor.extract(from: raw)
-                var data = try JSONDecoder().decode(ShokumukeirekishoData.self, from: jsonData)
-                data = Stages.polish(data, derived: repaired.derivedExperience)
-                let by = ProducedBy.external(model: model ?? "external")
-                try store.write(data, kind: .shokumukeirekisho, contentHash: contentHash, inputsHash: inputsHash,
-                                producedBy: by, mode: "external")
-                print("  ✓ Ingested shokumukeirekisho.json")
-            } catch {
-                let bundle = ErrorBundle(stage: "shokumukeirekisho", error: error.localizedDescription,
-                                         responsePath: workspaceURL.appendingPathComponent("shokumukeirekisho.response.json").path)
-                try? ExternalBridge.writeError(bundle, stage: "shokumukeirekisho", workspace: workspaceURL)
-                throw error
-            }
+            try ExternalBridge.ingestResponse(
+                stage: "shokumukeirekisho", kind: .shokumukeirekisho,
+                workspace: workspaceURL, store: store,
+                contentHash: contentHash, inputsHash: inputsHash, model: model,
+                as: ShokumukeirekishoData.self
+            ) { Stages.polish($0, derived: repaired.derivedExperience) }
             return
         }
 
