@@ -41,6 +41,7 @@ jpresume convert resume.md --provider claude-cli --format both
 ## Features
 
 - Parses markdown and PDF resumes (text-layer extraction; Vision OCR fallback for scanned PDFs)
+- Source-aware ingestion: markdown keeps a deterministic markdown parser, while PDF/plain-text input is cleaned and normalized through a text-resume path
 - LLM normalization — structured dates, bullet classification (achievement vs responsibility), skill grouping
 - Validation — date ranges, overlapping roles, `is_current` consistency, total experience
 - Interactive Japan-specific config — kanji name, furigana, education dates, work history, licenses — saved to YAML for reuse
@@ -59,3 +60,8 @@ jpresume convert resume.md --provider claude-cli --format both
 | [Config reference](skills/japanese-resume/references/config-schema.md) | `jpresume_config.yaml` field reference and template |
 | [External mode](skills/japanese-resume/references/external-mode.md) | Prompt bundle schema, response format, error recovery |
 | [Contributing](docs/contributing.md) | Build, test, lint, release process |
+
+## Notes
+
+- PDF input is no longer treated as if it were markdown. Extracted PDF/OCR text is preprocessed, stored in the workspace, and passed to normalization alongside the advisory parsed resume.
+- This source-aware path is intended to make future `docx` support straightforward: `docx` can plug into the same cleaned-text normalization flow without forcing another markdown-shaped parser step.
