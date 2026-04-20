@@ -3,6 +3,7 @@ import Foundation
 import PDFKit
 import SwiftDocX
 import Vision
+import ZIPFoundation
 
 enum ResumeInputReader {
     enum Error: Swift.Error, LocalizedError {
@@ -36,6 +37,10 @@ enum ResumeInputReader {
     // MARK: - DOCX extraction
 
     private static func extractFromDOCX(_ url: URL) throws -> String {
+        if let extracted = try extractStructuredTextFromDOCX(url), !extracted.isEmpty {
+            return extracted
+        }
+
         guard let document = try? Document(contentsOf: url) else {
             throw Error.cannotOpenDOCX(url)
         }
@@ -50,6 +55,89 @@ enum ResumeInputReader {
             throw Error.noExtractableText(url)
         }
         return text
+    }
+
+    private static func extractStructuredTextFromDOCX(_ url: URL) throws -> String? {
+        guard let archive = Archive(url: url, accessMode: .read),
+              let entry = archive["word/document.xml"] else {
+            return nil
+        }
+
+        var data = Data()
+        _ = try archive.extract(entry) { chunk in
+            data.append(chunk)
+        }
+
+        let xml = try XMLDocument(data: data)
+        let paragraphNodes = try xml.nodes(forXPath: "//*[local-name()='body']/*[local-name()='p']")
+        guard !paragraphNodes.isEmpty else { return nil }
+
+        let paragraphs = paragraphNodes.compactMap { node -> String? in
+            guard let element = node as? XMLElement else { return nil }
+            return textFromDOCXParagraph(element)
+        }
+
+        let text = paragraphs.joined(separator: "\n")
+            .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
+
+    private static func textFromDOCXParagraph(_ paragraph: XMLElement) -> String {
+        let isListItem = containsElement(named: "numPr", in: paragraph)
+        var fragments: [String] = []
+        collectDOCXText(from: paragraph, into: &fragments)
+
+        let joined = fragments.joined()
+        if joined.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return ""
+        }
+
+        let normalizedLines = joined
+            .components(separatedBy: "\n")
+            .map { $0.replacingOccurrences(of: #"\s+$"#, with: "", options: .regularExpression) }
+
+        if isListItem {
+            var prefixed: [String] = []
+            for line in normalizedLines {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.isEmpty { continue }
+                prefixed.append("• " + trimmed)
+            }
+            return prefixed.joined(separator: "\n")
+        }
+
+        return normalizedLines.joined(separator: "\n")
+    }
+
+    private static func collectDOCXText(from node: XMLNode, into fragments: inout [String]) {
+        if let element = node as? XMLElement {
+            switch element.localName {
+            case "t":
+                fragments.append(element.stringValue ?? "")
+                return
+            case "br":
+                fragments.append("\n")
+                return
+            default:
+                break
+            }
+        }
+
+        for child in node.children ?? [] {
+            collectDOCXText(from: child, into: &fragments)
+        }
+    }
+
+    private static func containsElement(named localName: String, in node: XMLNode) -> Bool {
+        if let element = node as? XMLElement, element.localName == localName {
+            return true
+        }
+        for child in node.children ?? [] {
+            if containsElement(named: localName, in: child) {
+                return true
+            }
+        }
+        return false
     }
 
     // MARK: - PDF extraction

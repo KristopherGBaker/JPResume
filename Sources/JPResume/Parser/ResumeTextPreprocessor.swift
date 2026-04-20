@@ -24,6 +24,12 @@ enum ResumeTextPreprocessor {
             notes.append("Merged standalone bullet markers with following text lines")
         }
 
+        let normalizedPipes = normalizePipeDelimiters(lines)
+        lines = normalizedPipes.lines
+        if normalizedPipes.changed {
+            notes.append("Normalized standalone pipe delimiters between text segments")
+        }
+
         let wrappedBullets = joinWrappedBulletLines(lines)
         lines = wrappedBullets.lines
         if wrappedBullets.changed {
@@ -103,6 +109,22 @@ enum ResumeTextPreprocessor {
         }
 
         return (result, changed)
+    }
+
+    private static func normalizePipeDelimiters(_ lines: [String]) -> (lines: [String], changed: Bool) {
+        var changed = false
+        let normalized = lines.map { line in
+            let updated = line.replacingOccurrences(
+                of: #"\s*\|\s*"#,
+                with: " | ",
+                options: .regularExpression
+            )
+            if updated != line {
+                changed = true
+            }
+            return updated
+        }
+        return (normalized, changed)
     }
 
     private static func collapseRepeatedBlankLines(_ lines: [String]) -> [String] {

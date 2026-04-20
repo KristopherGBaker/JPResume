@@ -25,11 +25,13 @@ struct ParserTests {
         EXPERIENCE
         Wolt / DoorDash | Senior Software Engineer
         May 2023 – Present | Tokyo, Japan
+        Lead engineer for membership growth in a large-scale consumer application.
         • Led implementation of subscription funnel improvements
         • Designed telemetry instrumentation and backend-driven UI systems
 
         SmartNews | Senior Software Engineer, iOS
         April 2019 – May 2023 | Tokyo, Japan
+        Core iOS engineer on a consumer news application.
         • Built and shipped features across feed rendering and onboarding
         • Conducted 100+ technical interviews across engineering roles.
 
@@ -120,7 +122,8 @@ struct ParserTests {
         #expect(resume.experience[0].startDate == "May 2023")
         #expect(resume.experience[0].endDate == "Present")
         #expect(resume.experience[0].location == "Tokyo, Japan")
-        #expect(resume.experience[0].bullets.count == 2)
+        #expect(resume.experience[0].bullets.count == 3)
+        #expect(resume.experience[0].bullets.first == "Lead engineer for membership growth in a large-scale consumer application.")
         #expect(resume.education.count == 1)
         #expect(resume.education[0].institution == "University of Illinois Springfield")
         #expect(resume.skills.contains("LLM integration, RAG systems") == false)

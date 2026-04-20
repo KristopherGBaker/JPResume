@@ -143,6 +143,7 @@ struct ResumeInputReaderTests {
         #expect(resume.education.count == 1)
         #expect(resume.skills.contains("SwiftUI"))
         #expect(resume.rawSections["Projects"]?.contains("AI Mock Interview Coach") == true)
+        #expect(resume.rawSections["Projects"]?.contains("Building a native macOS application for AI-driven mock interviews.") == true)
     }
 
     @Test func parsesResumeDOCXIntoStructuredResume() async throws {
@@ -159,6 +160,47 @@ struct ResumeInputReaderTests {
         #expect(resume.education.count == 1)
         #expect(resume.skills.contains("Swift"))
         #expect(resume.rawSections["Projects"]?.contains("AI Mock Interview Coach") == true)
+        #expect(resume.rawSections["Projects"]?.contains("Building a native macOS application for AI-driven mock interviews.") == true)
+    }
+
+    @Test func readsDOCXPreservingSoftBreaksAndListParagraphs() async throws {
+        let documentXML = """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <w:body>
+            <w:p>
+              <w:r><w:t xml:space="preserve">Senior Software Engineer</w:t><w:br w:type="textWrapping"/></w:r>
+              <w:r><w:t xml:space="preserve">Product-focused engineer</w:t></w:r>
+            </w:p>
+            <w:p>
+              <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>
+              <w:r><w:t xml:space="preserve">Built provider-agnostic orchestration</w:t></w:r>
+            </w:p>
+            <w:p>
+              <w:r><w:t xml:space="preserve">Wolt / DoorDash</w:t></w:r>
+              <w:r><w:t xml:space="preserve">  </w:t></w:r>
+              <w:r><w:t xml:space="preserve">|</w:t></w:r>
+              <w:r><w:t xml:space="preserve">  Senior Software Engineer</w:t></w:r>
+            </w:p>
+            <w:p>
+              <w:r><w:t xml:space="preserve">Bachelor of Science, Computer Science  |  Minor: Mathematics</w:t><w:br w:type="textWrapping"/><w:t xml:space="preserve">Summa Cum Laude</w:t></w:r>
+            </w:p>
+            <w:sectPr/>
+          </w:body>
+        </w:document>
+        """
+
+        let url = try makeDOCX(documentXML: documentXML)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let text = try await ResumeInputReader.read(from: url)
+        let preprocessed = ResumeTextPreprocessor.preprocess(text, sourceKind: .docx)
+
+        #expect(text.contains("Senior Software Engineer\nProduct-focused engineer"))
+        #expect(text.contains("• Built provider-agnostic orchestration"))
+        #expect(text.contains("Wolt / DoorDash|  Senior Software Engineer"))
+        #expect(text.contains("Minor: Mathematics\nSumma Cum Laude"))
+        #expect(preprocessed.cleanedText.contains("Wolt / DoorDash | Senior Software Engineer"))
     }
 }
 
@@ -168,6 +210,35 @@ extension ResumeInputReaderTests {
     private struct SetupError: Error { let message: String }
 
     private func makeDOCX(content: String) throws -> URL {
+        let paragraphs = content
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { line -> String in
+                let escaped = xmlEscaped(String(line))
+                if escaped.isEmpty {
+                    return "<w:p/>"
+                }
+                return """
+                <w:p>
+                  <w:r><w:t xml:space="preserve">\(escaped)</w:t></w:r>
+                </w:p>
+                """
+            }
+            .joined(separator: "\n")
+
+        let documentXML = """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <w:body>
+            \(paragraphs)
+            <w:sectPr/>
+          </w:body>
+        </w:document>
+        """
+
+        return try makeDOCX(documentXML: documentXML)
+    }
+
+    private func makeDOCX(documentXML: String) throws -> URL {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("jpresume_test_docx_\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -195,30 +266,7 @@ extension ResumeInputReaderTests {
         </Relationships>
         """.write(to: relsDir.appendingPathComponent(".rels"), atomically: true, encoding: .utf8)
 
-        let paragraphs = content
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .map { line -> String in
-                let escaped = xmlEscaped(String(line))
-                if escaped.isEmpty {
-                    return "<w:p/>"
-                }
-                return """
-                <w:p>
-                  <w:r><w:t xml:space="preserve">\(escaped)</w:t></w:r>
-                </w:p>
-                """
-            }
-            .joined(separator: "\n")
-
-        try """
-        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-          <w:body>
-            \(paragraphs)
-            <w:sectPr/>
-          </w:body>
-        </w:document>
-        """.write(to: wordDir.appendingPathComponent("document.xml"), atomically: true, encoding: .utf8)
+        try documentXML.write(to: wordDir.appendingPathComponent("document.xml"), atomically: true, encoding: .utf8)
 
         try """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
