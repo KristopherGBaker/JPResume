@@ -46,25 +46,8 @@ struct NormalizeCommand: AsyncParsableCommand {
 
         if external {
             let system = SystemPrompts.normalization()
-            let enc = JSONCoders.prettySorted
-            let westernJSON = (try? enc.encode(parsedArtifact.data)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-            let configJSON = (try? enc.encode(inputsArtifact.data.config)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
-            let sourceKind = inputsArtifact.data.sourceKind?.rawValue ?? "text"
-            let cleanedText = (try? enc.encode(inputsArtifact.data.cleanedText ?? inputsArtifact.data.sourceText)).flatMap {
-                String(data: $0, encoding: .utf8)
-            } ?? "null"
-            let notes = (try? enc.encode(inputsArtifact.data.preprocessingNotes)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
-            let user = """
-            {
-              "western_resume": \(westernJSON),
-              "japan_config": \(configJSON),
-              "source_input": {
-                "kind": "\(sourceKind)",
-                "cleaned_text": \(cleanedText),
-                "preprocessing_notes": \(notes)
-              }
-            }
-            """
+            let user = try PromptPayload.normalize(western: parsedArtifact.data, inputs: inputsArtifact.data,
+                                                   config: inputsArtifact.data.config)
             try ExternalBridge.emitPrompt(stage: "normalize", kind: .normalized, workspace: workspaceURL,
                                           sourceArtifacts: ["parsed.json", "inputs.json"],
                                           system: system, user: user, temperature: 0.2)
