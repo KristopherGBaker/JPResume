@@ -18,7 +18,7 @@ When you run `jpresume <stage> --workspace <ws> --external`, the CLI writes `<ws
     "era": "western"
   },
   "system": "You are a resume normalizer. …",
-  "user": "{\n  \"western_resume\": {...},\n  \"japan_config\": {...}\n}",
+  "user": "{\n  \"western_resume\": {...},\n  \"japan_config\": {...},\n  \"source_input\": {\"kind\": \"pdf\", \"cleaned_text\": \"...\", \"preprocessing_notes\": [...]}\n}",
   "temperature": 0.2,
   "expected_output_format": "json-only",
   "response_schema": {},
@@ -33,7 +33,7 @@ When you run `jpresume <stage> --workspace <ws> --external`, the CLI writes `<ws
 | `source_artifacts` | Which workspace files the bundle derives from — for audit/debug |
 | `stage_options` | Flags that influenced the prompt (era, side-projects, etc.). Reproduce these if the user asks you to re-generate matching a prior run. |
 | `system` | The full system prompt. Contains the schema description, hard rules (no fabrication, date format, required fields), and output contract. **Read this carefully.** |
-| `user` | The JSON payload to operate on. For `normalize` it's `{western_resume, japan_config}`. For the generate stages it's `{normalized_resume, japan_config, options}`. |
+| `user` | The JSON payload to operate on. For `normalize` it's `{western_resume, japan_config, source_input}` where `source_input` includes the input kind plus cleaned extracted text and preprocessing notes. For the generate stages it's `{normalized_resume, japan_config, options}`. |
 | `temperature` | Advisory; you don't need to honor it numerically. `0.2` signals "stick close to inputs, minimal creativity." |
 | `expected_output_format` | Always `json-only` for MVP. |
 | `response_schema` | Empty map for MVP — schema is prose-only inside `system`. |
@@ -99,7 +99,7 @@ Common decoder errors:
 
 ## Rules to carry across every LLM stage
 
-- **No fabrication.** If the user didn't provide a date, don't invent one. Mark `confidence: "low"` instead.
+- **No fabrication.** If the user didn't provide a date, don't invent one. Use the cleaned source text and config as evidence; if still uncertain, lower confidence instead.
 - **Preserve specificity.** Don't generalize "Led 5-engineer team" to "Led team." The generate stages translate — they don't summarize.
 - **Translate content, not structure.** Keep section ordering consistent with Japanese conventions (education chronological ascending for rirekisho, work history descending for shokumukeirekisho).
 - **Names and addresses come from `japan_config`.** The `user` payload includes both the western resume and the config — cross-reference. If config has `name_kanji`, use it, don't transliterate from the English.

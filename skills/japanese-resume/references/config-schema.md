@@ -1,6 +1,6 @@
 # `jpresume_config.yaml` reference
 
-Japan-specific fields the CLI needs beyond what a western markdown resume provides. Stored as YAML, loaded by `Sources/JPResume/Config/`, and snapshotted into `inputs.json` during `parse`.
+Japan-specific fields the CLI needs beyond what a western resume source provides. Stored as YAML, loaded by `Sources/JPResume/Config/`, and snapshotted into `inputs.json` during `parse`.
 
 Reference example: [`jpresume_config.example.yaml`](jpresume_config.example.yaml) (fictional, paired to the repo's `examples/resume.md`).
 
@@ -44,7 +44,7 @@ education_japanese:
 
 # Full Japanese-style work history.
 # Use this for roles that aren't on the western resume but belong on a 職歴 timeline,
-# OR to provide authoritative dates when the markdown resume's dates are ambiguous.
+# OR to provide authoritative dates when the source resume's dates are ambiguous.
 # Each job gets an 入社 and a 退職 entry (or 一身上の都合により退職 for personal reasons).
 work_japanese:
   - year_month: 2013年6月
@@ -62,7 +62,7 @@ licenses:
   - year_month: 2022年3月
     name: AWS Solutions Architect Associate
 
-# Optional free-text fields. If omitted, the LLM will draft them from the markdown.
+# Optional free-text fields. If omitted, the LLM will draft them from the source resume.
 # motivation:  志望動機 (why this company/role)
 # hobbies:     趣味・特技
 # self_pr:     自己PR (longer-form pitch)
@@ -94,7 +94,7 @@ licenses:
 
 ### `work_japanese`
 
-- **Source of truth for dates** when the western resume has ambiguous phrasing like "2019 - present". The LLM is instructed to prefer config dates over markdown dates during `normalize`.
+- **Source of truth for dates** when the western resume has ambiguous phrasing like "2019 - present". The LLM is instructed to prefer config dates over source-resume dates during `normalize`.
 - Include *every* employer that will appear on the rirekisho's 職歴 timeline. Japanese resumes show all past employers, even brief stints — don't trim.
 - Use `一身上の都合により退職` for "left for personal reasons" (standard euphemism). Use `会社都合により退職` for layoffs / company-initiated.
 - Freelance: `フリーランス <domain>` for entry, `フリーランス業務終了` for exit.
