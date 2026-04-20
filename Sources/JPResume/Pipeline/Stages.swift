@@ -10,7 +10,7 @@ enum Stages {
         switch sourceKind {
         case .markdown:
             return MarkdownParser.parse(text)
-        case .pdf, .text:
+        case .docx, .pdf, .text:
             return PlainTextResumeParser.parse(text)
         }
     }

@@ -1,5 +1,5 @@
 {
-  "originHash" : "07870c2e18b9c4ec3b0954115bf349b072c51b600d69c56fa1334b7bd129d82a",
+  "originHash" : "23526bbcefa78c0b199ef3f41cca956fab966589b85bb0bfee95c460cad41a2a",
   "pins" : [
     {
       "identity" : "swift-argument-parser",
@@ -11,12 +11,30 @@
       }
     },
     {
+      "identity" : "swiftdocx",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Techopolis/SwiftDocX",
+      "state" : {
+        "branch" : "master",
+        "revision" : "6643d97733f6f13845d3782b7b15f7564ae3dd39"
+      }
+    },
+    {
       "identity" : "yams",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jpsim/Yams",
       "state" : {
         "revision" : "3d6871d5b4a5cd519adf233fbb576e0a2af71c17",
         "version" : "5.4.0"
+      }
+    },
+    {
+      "identity" : "zipfoundation",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/weichsel/ZIPFoundation.git",
+      "state" : {
+        "revision" : "22787ffb59de99e5dc1fbfe80b19c97a904ad48d",
+        "version" : "0.9.20"
       }
     }
   ],

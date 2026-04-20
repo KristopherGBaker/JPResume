@@ -3,7 +3,7 @@
 ## One-shot conversion
 
 ```
-jpresume convert <input.md|.pdf> [options]
+jpresume convert <input.md|.docx|.pdf> [options]
 
 Options:
   -o, --output-dir DIR          Output directory (default: same as input)
@@ -56,7 +56,7 @@ When present, 志望動機, 職務要約, 自己PR, and role/achievement emphasi
 
 Each stage writes a versioned JSON artifact into `.jpresume/`. Reruns skip unchanged work via SHA-256 content hashing (covers input content + config + era + generation options + schema version).
 
-1. **Parse** — `.md` or `.pdf` → `WesternResume`. PDF text is extracted via PDFKit; scanned/image PDFs fall back to Vision OCR automatically.
+1. **Parse** — `.md`, `.docx`, or `.pdf` → `WesternResume`. DOCX text is extracted via `SwiftDocX`. PDF text is extracted via PDFKit; scanned/image PDFs fall back to Vision OCR automatically.
 2. **Config** — loads `jpresume_config.yaml` or prompts interactively; saved for reuse
 3. **Normalize** — LLM structures dates, classifies bullets (achievement vs responsibility), groups skills. Falls back to deterministic parsing if LLM fails. Config dates are ground truth.
 4. **Validate** — checks date ranges, overlaps, `is_current` consistency, total experience, low-confidence entries. `--strict` treats warnings as errors.
@@ -69,7 +69,7 @@ Each stage writes a versioned JSON artifact into `.jpresume/`. Reruns skip uncha
 For human review between stages or for use by an agent skill:
 
 ```
-jpresume parse <input.md|.pdf> [--workspace .jpresume]
+jpresume parse <input.md|.docx|.pdf> [--workspace .jpresume]
 jpresume normalize [--workspace] [--provider] [--external | --ingest]
 jpresume validate [--workspace] [--on normalized|repaired]
 jpresume repair [--workspace]
