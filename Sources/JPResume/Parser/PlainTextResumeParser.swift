@@ -307,8 +307,15 @@ enum PlainTextResumeParser {
         return WorkEntry(company: company, title: title)
     }
 
+    private static let monthNamePattern =
+        "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|"
+        + "January|February|March|April|June|July|August|September|October|November|December"
+
     private static func looksLikeDateLine(_ line: String) -> Bool {
-        line.range(of: #"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|June|July|August|September|October|November|December)\b.*[–—-].*(?:Present|Current|Now|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|June|July|August|September|October|November|December)\b)"#, options: [.regularExpression, .caseInsensitive]) != nil
+        let month = "\\b(?:\(monthNamePattern))\\b"
+        let endToken = "(?:Present|Current|Now|\(month))"
+        let pattern = "\(month).*[–—-].*\(endToken)"
+        return line.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
     }
 
     private static func applyDateLine(_ line: String, to entry: inout WorkEntry) {
@@ -448,6 +455,7 @@ private struct PlainRegexWrapper {
 }
 
 private func plainRegex(_ pattern: String, options: NSRegularExpression.Options = []) -> PlainRegexWrapper {
+    // swiftlint:disable:next force_try
     PlainRegexWrapper(regex: try! NSRegularExpression(pattern: pattern, options: options))
 }
 

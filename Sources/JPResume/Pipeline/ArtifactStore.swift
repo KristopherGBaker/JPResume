@@ -60,9 +60,7 @@ struct ArtifactStore: Sendable {
             warnings: warnings,
             data: value
         )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(artifact)
+        let data = try JSONCoders.prettySorted.encode(artifact)
 
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let dest = root.appendingPathComponent(kind.filename)
@@ -86,6 +84,17 @@ struct ArtifactStore: Sendable {
         return try JSONDecoder().decode(Artifact<T>.self, from: data)
     }
 
+    // MARK: Metadata
+
+    /// Decode the metadata-only header from an artifact file, if present and parseable.
+    /// Errors (missing file, bad JSON) collapse to `nil` — callers handle that as
+    /// "treat as missing/invalid" via `status(_:)`.
+    private func loadMetadata(_ kind: ArtifactKind) -> ArtifactMetadata? {
+        let url = root.appendingPathComponent(kind.filename)
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(ArtifactMetadata.self, from: data)
+    }
+
     // MARK: Status
 
     func status(_ kind: ArtifactKind, expectedContentHash: String? = nil) -> ArtifactStatus {
@@ -97,8 +106,7 @@ struct ArtifactStore: Sendable {
             }
             return .missing
         }
-        guard let data = try? Data(contentsOf: url),
-              let meta = try? JSONDecoder().decode(ArtifactMetadata.self, from: data) else {
+        guard let meta = loadMetadata(kind) else {
             return .invalid(reason: "cannot parse artifact file")
         }
         guard meta.schemaVersion == Self.schemaVersion else {
@@ -114,21 +122,11 @@ struct ArtifactStore: Sendable {
     // MARK: Produced-by for cache-hit log
 
     func producedBy(_ kind: ArtifactKind) -> String? {
-        let url = root.appendingPathComponent(kind.filename)
-        guard let data = try? Data(contentsOf: url),
-              let meta = try? JSONDecoder().decode(ArtifactMetadata.self, from: data) else {
-            return nil
-        }
-        return meta.producedBy
+        loadMetadata(kind)?.producedBy
     }
 
     func producedAt(_ kind: ArtifactKind) -> Date? {
-        let url = root.appendingPathComponent(kind.filename)
-        guard let data = try? Data(contentsOf: url),
-              let meta = try? JSONDecoder().decode(ArtifactMetadata.self, from: data) else {
-            return nil
-        }
-        return ISO8601DateFormatter().date(from: meta.producedAt)
+        loadMetadata(kind).flatMap { ISO8601DateFormatter().date(from: $0.producedAt) }
     }
 
     // MARK: List
@@ -140,19 +138,15 @@ struct ArtifactStore: Sendable {
             var producedBy: String?
             var warnCount = 0, errCount = 0, infoCount = 0
 
-            if case .fresh = s {
-                let url = root.appendingPathComponent(kind.filename)
-                if let data = try? Data(contentsOf: url),
-                   let meta = try? JSONDecoder().decode(ArtifactMetadata.self, from: data) {
-                    producedAt = meta.producedAt
-                    producedBy = meta.producedBy
-                    for w in meta.warnings {
-                        switch w.severity {
-                        case "info":    infoCount += 1
-                        case "warning": warnCount += 1
-                        case "error":   errCount += 1
-                        default: break
-                        }
+            if case .fresh = s, let meta = loadMetadata(kind) {
+                producedAt = meta.producedAt
+                producedBy = meta.producedBy
+                for w in meta.warnings {
+                    switch w.severity {
+                    case "info":    infoCount += 1
+                    case "warning": warnCount += 1
+                    case "error":   errCount += 1
+                    default: break
                     }
                 }
             }

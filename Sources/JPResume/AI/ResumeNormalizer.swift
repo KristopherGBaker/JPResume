@@ -42,8 +42,7 @@ struct ResumeNormalizer: Sendable {
     // MARK: - Private
 
     private func buildUserMessage(western: WesternResume, inputs: InputsData, config: JapanConfig) throws -> String {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let encoder = JSONCoders.prettySorted
         let westernJSON = try encoder.encode(western)
         let configJSON = try encoder.encode(config)
         let sourceKind = try encoder.encode(inputs.sourceKind?.rawValue)
