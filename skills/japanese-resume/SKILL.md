@@ -5,7 +5,7 @@ description: Create and iteratively refine Japanese-style resumes — 履歴書 
 
 # Japanese Resume Builder (JPResume)
 
-Drive the `jpresume` CLI stage-by-stage to turn a western markdown resume into a Japanese 履歴書 and 職務経歴書. You (the agent) act as the LLM for the normalize and generate stages via `--external` mode, so you can review, refine, and catch fabrications inline.
+Drive the `jpresume` CLI stage-by-stage to turn a western resume source (`.md` or `.pdf`) into a Japanese 履歴書 and 職務経歴書. You (the agent) act as the LLM for the normalize and generate stages via `--external` mode, so you can review, refine, and catch fabrications inline.
 
 Tool: `jpresume` (Swift CLI from the JPResume repo; typically installed at `/usr/local/bin/jpresume` via `make install`).
 
@@ -13,8 +13,8 @@ Tool: `jpresume` (Swift CLI from the JPResume repo; typically installed at `/usr
 
 1. **External mode by default.** You produce the JSON for `normalize`, `generate rirekisho`, and `generate shokumukeirekisho`. Don't route through `--provider claude-cli` unless the user asks for autonomous/batch. Rationale: you can inspect the prompt, reason about edge cases, and fix mistakes without a round-trip to another CLI.
 2. **Pause after validate.** Run parse → normalize → repair → validate automatically. Stop there, surface warnings to the user, fix issues (either by editing `normalized.json` or asking the user for ground truth), then continue to generate + render after confirmation.
-3. **Never fabricate.** Dates, employers, titles, and achievements must come from the source markdown or `jpresume_config.yaml`. If something is missing, ask. The normalizer's system prompt is explicit about this — follow it.
-4. **Ground-truth from config.** `jpresume_config.yaml` (kanji name, furigana, address, education/work timelines, certifications) is authoritative. The resume markdown is secondary for dates when the config disagrees.
+3. **Never fabricate.** Dates, employers, titles, and achievements must come from the source resume text or `jpresume_config.yaml`. If something is missing, ask. The normalizer's system prompt is explicit about this — follow it.
+4. **Ground-truth from config.** `jpresume_config.yaml` (kanji name, furigana, address, education/work timelines, certifications) is authoritative. The source resume text is secondary for dates when the config disagrees.
 5. **Hand-edit `role: source` artifacts freely, never `role: derived`.** `normalized.json`, `rirekisho.json`, `shokumukeirekisho.json` are editable and survive until upstream regen. `repaired.json` and `validation.json` are regenerated every run.
 
 ## When to use this skill
@@ -46,7 +46,7 @@ Before the first stage:
 Every LLM stage (`normalize`, `generate rirekisho`, `generate shokumukeirekisho`) uses the same three-step pattern. Full details in [references/external-mode.md](references/external-mode.md).
 
 1. **Emit**: `jpresume <stage> --workspace <ws> --external` writes `<ws>/<stage>.prompt.json` and exits.
-2. **Respond**: Read the bundle with the `Read` tool. Follow the `system` field's instructions to produce JSON that matches the schema described in it. The `user` field is the payload (parsed resume + config, or repaired resume + config). Write the raw JSON body to the path given in `response_path` (typically `<ws>/<stage>.response.json`) with the `Write` tool.
+2. **Respond**: Read the bundle with the `Read` tool. Follow the `system` field's instructions to produce JSON that matches the schema described in it. The `user` field is the payload (parsed resume + config + source input metadata for `normalize`, or repaired resume + config for generate stages). Write the raw JSON body to the path given in `response_path` (typically `<ws>/<stage>.response.json`) with the `Write` tool.
 3. **Ingest**: `jpresume <stage> --workspace <ws> --ingest` decodes the response, runs polish rules, and writes the artifact. On failure it writes `<stage>.error.json` — read it, fix the issue, re-write the response, re-run `--ingest`.
 
 Return ONLY JSON in the response file. No prose, no markdown commentary. Code fences are tolerated but unnecessary.
@@ -59,7 +59,7 @@ Return ONLY JSON in the response file. No prose, no markdown commentary. Code fe
 jpresume parse <input.md|.pdf> --workspace <ws>
 ```
 
-Accepts `.md` or `.pdf`. PDF text is extracted automatically (PDFKit for text-layer PDFs; Vision OCR for scanned/image PDFs). Produces `inputs.json` (source path + hash + effective `JapanConfig` snapshot) and `parsed.json` (a `WesternResume`). No review needed — it's deterministic.
+Accepts `.md` or `.pdf`. PDF text is extracted automatically (PDFKit for text-layer PDFs; Vision OCR for scanned/image PDFs). Markdown input uses the markdown parser directly. PDF/plain-text input is preprocessed into cleaned text, then parsed through the plain-text parser. Produces `inputs.json` (source path + hash + effective `JapanConfig` snapshot + source text metadata) and `parsed.json` (a `WesternResume`). Parsing is deterministic, but for PDF/OCR input it is advisory rather than exhaustive — normalize also sees the cleaned source text.
 
 ### 2. Normalize (LLM — you drive)
 
@@ -70,7 +70,7 @@ jpresume normalize --workspace <ws> --external
 jpresume normalize --workspace <ws> --ingest
 ```
 
-Output: `normalized.json` — structured dates (year/month ints), bullets classified as `achievement` or `responsibility`, skills grouped into categories, per-entry `confidence`. Use `JapanConfig` dates as ground truth when they disagree with free-text in the markdown.
+Output: `normalized.json` — structured dates (year/month ints), bullets classified as `achievement` or `responsibility`, skills grouped into categories, per-entry `confidence`. Use `JapanConfig` dates as ground truth when they disagree with free-text in the source resume.
 
 Read `system` for the full contract. Key rules:
 - Never invent dates. If uncertain, set `confidence` below 0.8 on that entry.

@@ -44,17 +44,20 @@ application mode (adjusts 志望動機, 職務要約, 自己PR, role/achievement
 
 Pipeline: **Parse → Normalize → Validate → Adapt → Render**
 
-1. **Input reading** (`Sources/JPResume/Parser/ResumeInputReader.swift`) accepts `.md` or `.pdf`. For PDFs, `PDFKit` text extraction is attempted first; if the result is under 100 characters (scanned/image PDF), `Vision` OCR is used as fallback. The extracted text then flows into the parser unchanged.
-   **Parser** (`Sources/JPResume/Parser/MarkdownParser.swift`) converts the text into `WesternResume`. Uses `NSRegularExpression` for pattern matching. Supports H2, H3, and bold-text section headings.
+1. **Input reading** (`Sources/JPResume/Parser/ResumeInputReader.swift`) accepts `.md` or `.pdf`. For PDFs, `PDFKit` text extraction is attempted first; if the result is under 100 characters (scanned/image PDF), `Vision` OCR is used as fallback.
+   **Source-aware parsing** then branches by input kind:
+   - markdown uses `Sources/JPResume/Parser/MarkdownParser.swift`
+   - PDF/plain text uses `Sources/JPResume/Parser/ResumeTextPreprocessor.swift` and `Sources/JPResume/Parser/PlainTextResumeParser.swift`
+   The resulting `WesternResume` is advisory for non-markdown inputs; normalization also receives cleaned source text from `inputs.json`.
 2. **Config** (`Sources/JPResume/Config/`) loads `jpresume_config.yaml` (Japan-specific fields: kanji name, furigana, education dates, work history) or prompts interactively, then saves for reuse via Yams.
-3. **Normalize** (`Sources/JPResume/AI/ResumeNormalizer.swift`) sends `WesternResume` + `JapanConfig` to LLM, returns `NormalizedResume` with structured dates, classified bullets (achievement vs responsibility), and categorized skills. Falls back to deterministic parsing if LLM fails. Cached to `.normalized_cache.json`.
+3. **Normalize** (`Sources/JPResume/AI/ResumeNormalizer.swift`) sends `WesternResume` + `JapanConfig` + source input metadata (`source_kind`, cleaned source text, preprocessing notes) to LLM, returns `NormalizedResume` with structured dates, classified bullets (achievement vs responsibility), and categorized skills. Falls back to deterministic parsing if LLM fails. Cached to `.normalized_cache.json`.
 4. **Validate** (`Sources/JPResume/Validation/ResumeValidator.swift`) runs rule-based checks on `NormalizedResume`: date range validity, isCurrent consistency, overlapping roles, total years of experience, low confidence entries. Emits warnings; use `--strict` to treat them as errors.
 5. **Adapt** (`Sources/JPResume/AI/ResumeAI.swift`) sends `NormalizedResume` + `JapanConfig` to LLM, returns `RirekishoData` / `ShokumukeirekishoData` as JSON. Cached to `.rirekisho_cache.json` / `.shokumukeirekisho_cache.json`.
 6. **Render** (`Sources/JPResume/Render/` + `Sources/JPResume/PDF/`) produces markdown (string interpolation templates) and PDF output (CoreGraphics).
 
 ### Intermediate Models
 
-- `WesternResume` — raw parsed output from the deterministic parser. Dates are strings, bullets are flat.
+- `WesternResume` — raw parsed output from the deterministic parser layer. Dates are strings, bullets are flat. For PDF/plain-text input it is advisory rather than exhaustive.
 - `NormalizedResume` — canonical intermediate produced by `ResumeNormalizer`. Contains `StructuredDate` (year/month ints), `NormalizedBullet` (with `.responsibility`/`.achievement` classification), `SkillCategory` groups, and per-entry `confidence` scores.
 - `TargetCompanyContext` (`Sources/JPResume/Models/TargetCompanyContext.swift`) — optional tailoring layer. Fields: `company_name`, `role_title`, `company_summary`, `job_description_excerpt`, `normalized_requirements`, `emphasis_tags`, `candidate_interest_notes`. All optional. Loaded from a JSON file via `--target`; folded into `ArtifactHashes` so the cache is invalidated when the file changes.
 
@@ -71,7 +74,7 @@ to `<outputDir>/.jpresume/` (overridable via `--workspace`):
 
 ```
 .jpresume/
-  inputs.json           # source path + markdown hash + effective JapanConfig
+  inputs.json           # source path + content hash + effective JapanConfig + source kind/text metadata
   parsed.json           # WesternResume (role: source)
   normalized.json       # NormalizedResume (role: source — agent edit target)
   repaired.json         # NormalizedResume post-consistency-check (role: derived)
@@ -92,6 +95,8 @@ Key types:
   (`"source"`/`"derived"`), `schema_version`, `content_hash`, `inputs_hash`,
   `produced_at`, `produced_by`, `mode` (`"internal"`/`"external"`), and structured
   `warnings`. Supersedes the old `CacheEnvelope<T>`.
+- `InputsData` now snapshots `source_kind`, `source_text`, `cleaned_text`, and
+  `preprocessing_notes` so normalize can reason from the extracted resume text directly.
 - `ArtifactStore` (`Pipeline/ArtifactStore.swift`) — typed read/write with atomic
   `replaceItem` writes, a four-state `ArtifactStatus` (`.fresh` / `.stale(reason)` /
   `.missing` / `.invalid(reason)`), and legacy fallback for
