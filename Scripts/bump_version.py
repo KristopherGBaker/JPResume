@@ -74,18 +74,51 @@ def verify_contributing_doc(path: Path) -> None:
         raise SystemExit(f"Expected release instructions to mention bump_version.py in {path}")
 
 
+def parse_version(version: str) -> tuple[int, int, int]:
+    if not SEMVER_RE.fullmatch(version):
+        raise SystemExit(f"Version must be semantic versioning like 0.4.2, got: {version}")
+    major, minor, patch = version.split(".")
+    return int(major), int(minor), int(patch)
+
+
+def format_version(parts: tuple[int, int, int]) -> str:
+    major, minor, patch = parts
+    return f"{major}.{minor}.{patch}"
+
+
+def read_current_version(repo_root: Path) -> str:
+    jpresume = (repo_root / "Sources/JPResume/JPResume.swift").read_text()
+    match = re.search(r'version:\s*"(\d+\.\d+\.\d+)"', jpresume)
+    if not match:
+        raise SystemExit("Could not find current version in Sources/JPResume/JPResume.swift")
+    return match.group(1)
+
+
+def increment_version(current_version: str, part: str) -> str:
+    major, minor, patch = parse_version(current_version)
+    if part == "major":
+        return format_version((major + 1, 0, 0))
+    if part == "minor":
+        return format_version((major, minor + 1, 0))
+    if part == "patch":
+        return format_version((major, minor, patch + 1))
+    raise SystemExit(f"Unsupported increment part: {part}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Bump the JPResume release version across source and docs.")
-    parser.add_argument("version", help="New semantic version, for example 0.4.2")
+    parser.add_argument("version", nargs="?", help="New semantic version, for example 0.4.2")
+    parser.add_argument(
+        "--part",
+        choices=["major", "minor", "patch"],
+        help="Increment the current version by one semantic version part.",
+    )
     parser.add_argument(
         "--check",
         action="store_true",
         help="Validate that all managed version references already match the provided version.",
     )
     args = parser.parse_args()
-
-    if not SEMVER_RE.fullmatch(args.version):
-        raise SystemExit(f"Version must be semantic versioning like 0.4.2, got: {args.version}")
 
     repo_root = Path(__file__).resolve().parent.parent
     managed_files = [
@@ -96,23 +129,32 @@ def main() -> int:
         repo_root / "docs/contributing.md",
     ]
 
+    if args.version and args.part:
+        raise SystemExit("Specify either an explicit version or --part, not both")
+    if not args.version and not args.part:
+        raise SystemExit("Provide either an explicit version or --part {major,minor,patch}")
+
+    current_version = read_current_version(repo_root)
+    target_version = args.version if args.version else increment_version(current_version, args.part)
+    parse_version(target_version)
+
     if args.check:
         mismatches: list[str] = []
 
         jpresume = (repo_root / "Sources/JPResume/JPResume.swift").read_text()
-        if f'version: "{args.version}"' not in jpresume:
+        if f'version: "{target_version}"' not in jpresume:
             mismatches.append("Sources/JPResume/JPResume.swift")
 
         artifact = (repo_root / "Sources/JPResume/Pipeline/Artifact.swift").read_text()
-        if f'static let version = "{args.version}"' not in artifact:
+        if f'static let version = "{target_version}"' not in artifact:
             mismatches.append("Sources/JPResume/Pipeline/Artifact.swift")
 
         cli_doc = (repo_root / "docs/cli.md").read_text()
-        if f"jpresume/{args.version}" not in cli_doc:
+        if f"jpresume/{target_version}" not in cli_doc:
             mismatches.append("docs/cli.md")
 
         claude = (repo_root / "CLAUDE.md").read_text()
-        if f"jpresume/{args.version}" not in claude:
+        if f"jpresume/{target_version}" not in claude:
             mismatches.append("CLAUDE.md")
 
         verify_contributing_doc(repo_root / "docs/contributing.md")
@@ -120,22 +162,22 @@ def main() -> int:
         if mismatches:
             raise SystemExit("Version mismatch in: " + ", ".join(mismatches))
 
-        print(f"All managed version references already match {args.version}")
+        print(f"All managed version references already match {target_version}")
         return 0
 
     changed_files: list[Path] = []
     for path in managed_files:
-        if update_file(path, args.version):
+        if update_file(path, target_version):
             changed_files.append(path)
 
     verify_contributing_doc(repo_root / "docs/contributing.md")
 
     if changed_files:
-        print(f"Bumped version to {args.version} in:")
+        print(f"Bumped version from {current_version} to {target_version} in:")
         for path in changed_files:
             print(f"- {path.relative_to(repo_root)}")
     else:
-        print(f"No changes needed; managed version references already match {args.version}")
+        print(f"No changes needed; managed version references already match {target_version}")
 
     return 0
 
