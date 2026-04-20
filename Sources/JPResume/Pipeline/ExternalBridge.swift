@@ -96,6 +96,40 @@ enum ExternalBridge {
         try data.write(to: url)
         print("  Error written to \(url.path)")
     }
+
+    /// Read an external agent's response, decode it, optionally transform it,
+    /// and write the resulting artifact. Wraps the read → extract → decode →
+    /// (transform) → write pipeline shared by every `--ingest` flow, including
+    /// the `ErrorBundle` cleanup that fires when any step throws.
+    static func ingestResponse<T: Codable>(
+        stage: String,
+        kind: ArtifactKind,
+        workspace: URL,
+        store: ArtifactStore,
+        contentHash: String,
+        inputsHash: String,
+        model: String?,
+        as _: T.Type = T.self,
+        transform: (T) -> T = { $0 }
+    ) throws {
+        let raw = try readResponse(stage: stage, workspace: workspace)
+        do {
+            let jsonData = try JSONExtractor.extract(from: raw)
+            let decoded = try JSONDecoder().decode(T.self, from: jsonData)
+            let final = transform(decoded)
+            let by = ProducedBy.external(model: model ?? "external")
+            try store.write(final, kind: kind, contentHash: contentHash, inputsHash: inputsHash,
+                            producedBy: by, mode: "external")
+            print("  ✓ Ingested \(kind.filename)")
+        } catch {
+            let bundle = ErrorBundle(
+                stage: stage, error: error.localizedDescription,
+                responsePath: workspace.appendingPathComponent("\(stage).response.json").path
+            )
+            try? writeError(bundle, stage: stage, workspace: workspace)
+            throw error
+        }
+    }
 }
 
 // MARK: - ErrorBundle
