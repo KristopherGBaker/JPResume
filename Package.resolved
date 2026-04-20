@@ -1,5 +1,5 @@
 {
-  "originHash" : "23526bbcefa78c0b199ef3f41cca956fab966589b85bb0bfee95c460cad41a2a",
+  "originHash" : "a4656847e620129354eaaedeaf1dd80f160ea12947dcc1023d30e62d8d14a5a3",
   "pins" : [
     {
       "identity" : "swift-argument-parser",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Techopolis/SwiftDocX",
       "state" : {
-        "branch" : "master",
-        "revision" : "6643d97733f6f13845d3782b7b15f7564ae3dd39"
+        "revision" : "6643d97733f6f13845d3782b7b15f7564ae3dd39",
+        "version" : "1.0.1"
       }
     },
     {
