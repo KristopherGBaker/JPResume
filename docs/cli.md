@@ -101,9 +101,9 @@ $ jpresume inspect --workspace .jpresume
 
 Artifact                  Status     Produced by                          Age
 ──────────────────────────────────────────────────────────────────────────────
-inputs.json               ✓ fresh    jpresume/0.4.0                        2m ago
-parsed.json               ✓ fresh    jpresume/0.4.0                        2m ago
-normalized.json           ~ stale    jpresume/0.4.0 ollama:gemma4          1h ago
+inputs.json               ✓ fresh    jpresume/0.4.1                        2m ago
+parsed.json               ✓ fresh    jpresume/0.4.1                        2m ago
+normalized.json           ~ stale    jpresume/0.4.1 ollama:gemma4          1h ago
 repaired.json               missing
 ```
 

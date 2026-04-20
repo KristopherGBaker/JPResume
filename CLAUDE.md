@@ -113,7 +113,7 @@ Key types:
   `--include-side-projects` and `--exclude-older-roles` now correctly invalidate
   the cache (fix for the pre-refactor bug).
 - `ProducedBy` — canonical grammar for `produced_by`: deterministic stages emit
-  `jpresume/0.4.0`, LLM stages emit `jpresume/0.4.0 anthropic:claude-sonnet-4-6`,
+  `jpresume/0.4.1`, LLM stages emit `jpresume/0.4.1 anthropic:claude-sonnet-4-6`,
   external mode emits `claude-code/external <model>`.
 
 ### Legacy cache format

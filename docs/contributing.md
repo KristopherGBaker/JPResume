@@ -43,5 +43,5 @@ Releases are tagged `v*` and published to [GitHub Releases](https://github.com/K
 
 To cut a release:
 
-1. Bump the version string in `Sources/JPResume/JPResume.swift` and `Sources/JPResume/Pipeline/Artifact.swift`
-2. Commit and tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
+1. Run `python3 Scripts/bump_version.py X.Y.Z`
+2. Review the diff, commit it, then tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`
