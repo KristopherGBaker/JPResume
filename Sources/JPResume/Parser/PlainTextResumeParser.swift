@@ -138,7 +138,7 @@ enum PlainTextResumeParser {
                 index += 1
             }
             let block = lines[blockStart..<index].joined(separator: "\n")
-            entry.bullets = parseBulletParagraphs(block)
+            entry.bullets = parseExperienceParagraphs(block)
             entries.append(entry)
         }
 
@@ -276,13 +276,15 @@ enum PlainTextResumeParser {
         var prefix: [String] = []
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.isEmpty || trimmed.hasPrefix("•") || trimmed.hasPrefix("●") || trimmed.hasPrefix("-") || trimmed.hasPrefix("*") {
+            if isBulletStart(trimmed) {
                 break
             }
-            prefix.append(trimmed)
+            if !trimmed.isEmpty {
+                prefix.append(trimmed)
+            }
         }
 
-        var sections = prefix.filter { !$0.isEmpty }
+        var sections = prefix
         sections.append(contentsOf: bullets.map { "• \($0)" })
         return sections.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -354,6 +356,56 @@ enum PlainTextResumeParser {
 
         flush()
         return bullets
+    }
+
+    private static func parseExperienceParagraphs(_ content: String) -> [String] {
+        let lines = content.components(separatedBy: "\n")
+        var paragraphs: [String] = []
+        var current: String?
+        var currentIsBullet = false
+
+        func flush() {
+            if let current, !current.isEmpty {
+                paragraphs.append(current.trimmingCharacters(in: .whitespaces))
+            }
+            current = nil
+            currentIsBullet = false
+        }
+
+        for rawLine in lines {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.isEmpty {
+                flush()
+                continue
+            }
+
+            if let range = line.range(of: #"^(?:[-*•●])\s*"#, options: .regularExpression) {
+                flush()
+                let stripped = String(line[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+                if !stripped.isEmpty {
+                    current = stripped
+                    currentIsBullet = true
+                }
+                continue
+            }
+
+            if let existing = current {
+                current = existing + " " + line
+            } else {
+                current = line
+            }
+
+            if !currentIsBullet {
+                currentIsBullet = false
+            }
+        }
+
+        flush()
+        return paragraphs
+    }
+
+    private static func isBulletStart(_ line: String) -> Bool {
+        line.hasPrefix("•") || line.hasPrefix("●") || line.hasPrefix("-") || line.hasPrefix("*")
     }
 
     private static func isEducationHeading(_ line: String) -> Bool {
