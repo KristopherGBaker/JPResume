@@ -55,20 +55,12 @@ struct NormalizeCommand: AsyncParsableCommand {
         }
 
         if ingest {
-            let raw = try ExternalBridge.readResponse(stage: "normalize", workspace: workspaceURL)
-            do {
-                let jsonData = try JSONExtractor.extract(from: raw)
-                let normalized = try JSONDecoder().decode(NormalizedResume.self, from: jsonData)
-                let by = ProducedBy.external(model: model ?? "external")
-                try store.write(normalized, kind: .normalized, contentHash: inputsHash, inputsHash: inputsHash,
-                                producedBy: by, mode: "external")
-                print("  ✓ Ingested normalized.json")
-            } catch {
-                let bundle = ErrorBundle(stage: "normalize", error: error.localizedDescription,
-                                         responsePath: workspaceURL.appendingPathComponent("normalize.response.json").path)
-                try? ExternalBridge.writeError(bundle, stage: "normalize", workspace: workspaceURL)
-                throw error
-            }
+            try ExternalBridge.ingestResponse(
+                stage: "normalize", kind: .normalized,
+                workspace: workspaceURL, store: store,
+                contentHash: inputsHash, inputsHash: inputsHash, model: model,
+                as: NormalizedResume.self
+            )
             return
         }
 
