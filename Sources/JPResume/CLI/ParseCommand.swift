@@ -34,8 +34,10 @@ struct ParseCommand: AsyncParsableCommand {
         let store = ArtifactStore(root: workspaceURL)
 
         print("Parsing \(inputURL.lastPathComponent)...")
+        let sourceKind = ResumeSourceKind.from(url: inputURL)
         let text = try await ResumeInputReader.read(from: inputURL)
-        let western = Stages.parse(markdown: text)
+        let preprocessed = ResumeTextPreprocessor.preprocess(text, sourceKind: sourceKind)
+        let western = Stages.parse(text: preprocessed.cleanedText, sourceKind: sourceKind)
         print("  Found: \(western.experience.count) work entries, "
               + "\(western.education.count) education entries, "
               + "\(western.skills.count) skills")
@@ -45,10 +47,18 @@ struct ParseCommand: AsyncParsableCommand {
         )
         let enc = JSONEncoder(); enc.outputFormatting = [.sortedKeys]
         let configData = try? enc.encode(japanConfig)
-        let inputsHash = ArtifactHashes.inputs(markdownContent: text, configData: configData)
+        let inputsHash = ArtifactHashes.inputs(markdownContent: preprocessed.cleanedText, configData: configData)
         let by = ProducedBy.jpresume()
 
-        let inputsData = InputsData(sourcePath: inputURL.path, markdownHash: inputsHash, config: japanConfig)
+        let inputsData = InputsData(
+            sourcePath: inputURL.path,
+            markdownHash: inputsHash,
+            config: japanConfig,
+            sourceKind: sourceKind,
+            sourceText: text,
+            cleanedText: preprocessed.cleanedText,
+            preprocessingNotes: preprocessed.notes
+        )
         try store.write(inputsData, kind: .inputs, contentHash: inputsHash, inputsHash: inputsHash, producedBy: by)
         try store.write(western, kind: .parsed, contentHash: inputsHash, inputsHash: inputsHash, producedBy: by)
 

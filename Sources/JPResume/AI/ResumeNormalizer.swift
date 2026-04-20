@@ -4,9 +4,9 @@ struct ResumeNormalizer: Sendable {
     let provider: any AIProvider
     let verbose: Bool
 
-    func normalize(western: WesternResume, config: JapanConfig) async throws -> NormalizedResume {
+    func normalize(western: WesternResume, inputs: InputsData, config: JapanConfig) async throws -> NormalizedResume {
         let system = SystemPrompts.normalization()
-        let user = try buildUserMessage(western: western, config: config)
+        let user = try buildUserMessage(western: western, inputs: inputs, config: config)
 
         if verbose {
             print("\n  [Normalizer] System prompt (\(system.count) chars)")
@@ -41,15 +41,23 @@ struct ResumeNormalizer: Sendable {
 
     // MARK: - Private
 
-    private func buildUserMessage(western: WesternResume, config: JapanConfig) throws -> String {
+    private func buildUserMessage(western: WesternResume, inputs: InputsData, config: JapanConfig) throws -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let westernJSON = try encoder.encode(western)
         let configJSON = try encoder.encode(config)
+        let sourceKind = try encoder.encode(inputs.sourceKind?.rawValue)
+        let cleanedText = try encoder.encode(inputs.cleanedText ?? inputs.sourceText)
+        let notes = try encoder.encode(inputs.preprocessingNotes)
         return """
         {
           "western_resume": \(String(data: westernJSON, encoding: .utf8)!),
-          "japan_config": \(String(data: configJSON, encoding: .utf8)!)
+          "japan_config": \(String(data: configJSON, encoding: .utf8)!),
+          "source_input": {
+            "kind": \(String(data: sourceKind, encoding: .utf8)!),
+            "cleaned_text": \(String(data: cleanedText, encoding: .utf8)!),
+            "preprocessing_notes": \(String(data: notes, encoding: .utf8)!)
+          }
         }
         """
     }

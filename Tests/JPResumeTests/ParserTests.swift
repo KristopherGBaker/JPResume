@@ -5,10 +5,39 @@ import Foundation
 @Suite("Markdown Parser")
 struct ParserTests {
     let sampleResume: String
+    let plainTextResume: String
 
     init() throws {
         let url = Bundle.module.url(forResource: "sample_resume", withExtension: "md", subdirectory: "Fixtures")!
         sampleResume = try String(contentsOf: url, encoding: .utf8)
+        plainTextResume = """
+        KRISTOPHER BAKER
+        Senior Software Engineer
+        Tokyo, Japan | kristopher.g.baker@gmail.com | linkedin.com/in/kristophergbaker
+
+        SUMMARY
+        Product-focused engineer specializing in growth, consumer applications, and AI-enabled systems.
+
+        CORE COMPETENCIES
+        Languages & Platforms: Swift, Objective-C, Python; UIKit, SwiftUI, AppKit, AVFoundation
+        AI-Enabled Product Development: LLM integration, RAG systems
+
+        EXPERIENCE
+        Wolt / DoorDash | Senior Software Engineer
+        May 2023 – Present | Tokyo, Japan
+        • Led implementation of subscription funnel improvements
+        • Designed telemetry instrumentation and backend-driven UI systems
+
+        SmartNews | Senior Software Engineer, iOS
+        April 2019 – May 2023 | Tokyo, Japan
+        • Built and shipped features across feed rendering and onboarding
+        • Conducted 100+ technical interviews across engineering roles.
+
+        EDUCATION
+        University of Illinois Springfield
+        Bachelor of Science, Computer Science | Minor: Mathematics
+        Summa Cum Laude
+        """
     }
 
     @Test func parseName() {
@@ -79,5 +108,38 @@ struct ParserTests {
         #expect(resume.name == "John")
         #expect(resume.experience.count == 1)
         #expect(resume.experience[0].company == "Acme")
+    }
+
+    @Test func parsePlainTextResume() {
+        let preprocessed = ResumeTextPreprocessor.preprocess(plainTextResume, sourceKind: .pdf)
+        let resume = PlainTextResumeParser.parse(preprocessed.cleanedText)
+        #expect(resume.name == "KRISTOPHER BAKER")
+        #expect(resume.contact.email == "kristopher.g.baker@gmail.com")
+        #expect(resume.experience.count == 2)
+        #expect(resume.experience[0].company == "Wolt / DoorDash")
+        #expect(resume.experience[0].startDate == "May 2023")
+        #expect(resume.experience[0].endDate == "Present")
+        #expect(resume.experience[0].location == "Tokyo, Japan")
+        #expect(resume.experience[0].bullets.count == 2)
+        #expect(resume.education.count == 1)
+        #expect(resume.education[0].institution == "University of Illinois Springfield")
+        #expect(resume.skills.contains("LLM integration, RAG systems") == false)
+        #expect(resume.skills.contains("LLM integration"))
+        #expect(resume.skills.contains("Swift"))
+        #expect(resume.skills.contains("Python"))
+    }
+
+    @Test func preprocessorFixesCommonOCRTechTerms() {
+        let text = """
+        SUMMARY
+        Building Al-enabled features with SwiftUl and OpenAl.
+        Authored RFs and stored vectors in 5Qlite.
+        """
+        let preprocessed = ResumeTextPreprocessor.preprocess(text, sourceKind: .pdf)
+        #expect(preprocessed.cleanedText.contains("AI-enabled"))
+        #expect(preprocessed.cleanedText.contains("SwiftUI"))
+        #expect(preprocessed.cleanedText.contains("OpenAI"))
+        #expect(preprocessed.cleanedText.contains("RFCs"))
+        #expect(preprocessed.cleanedText.contains("SQLite"))
     }
 }
