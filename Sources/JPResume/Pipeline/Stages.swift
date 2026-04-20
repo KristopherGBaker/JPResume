@@ -6,20 +6,26 @@ enum Stages {
 
     // MARK: - Parse
 
-    static func parse(markdown: String) -> WesternResume {
-        MarkdownParser.parse(markdown)
+    static func parse(text: String, sourceKind: ResumeSourceKind) -> WesternResume {
+        switch sourceKind {
+        case .markdown:
+            return MarkdownParser.parse(text)
+        case .pdf, .text:
+            return PlainTextResumeParser.parse(text)
+        }
     }
 
     // MARK: - Normalize
 
     static func normalize(
         western: WesternResume,
+        inputs: InputsData,
         config: JapanConfig,
         provider: any AIProvider,
         verbose: Bool
     ) async throws -> NormalizedResume {
         let normalizer = ResumeNormalizer(provider: provider, verbose: verbose)
-        return try await normalizer.normalize(western: western, config: config)
+        return try await normalizer.normalize(western: western, inputs: inputs, config: config)
     }
 
     // MARK: - Validate

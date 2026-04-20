@@ -10,9 +10,14 @@ enum SystemPrompts {
         You are an expert resume parser. You will receive:
         1. A parsed western-style resume (JSON) with raw string dates and flat bullet lists
         2. Japan-specific config data (JSON) that may contain authoritative work/education dates
+        3. Optional cleaned source resume text (JSON) extracted from PDF/plain text input
 
         Your task is to produce a normalized, structured resume in JSON format.
         All text stays in the source language (do NOT translate to Japanese).
+
+        Treat source_input.cleaned_text as the authoritative fallback whenever the parsed
+        western_resume is sparse, incomplete, or clearly missed structure from PDF/plain text.
+        Use western_resume when it is helpful, but do not assume it is complete.
 
         # Core rules
 

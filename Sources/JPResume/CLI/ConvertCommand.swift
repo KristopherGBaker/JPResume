@@ -78,8 +78,10 @@ struct ConvertCommand: AsyncParsableCommand {
 
         // Step 1: Parse
         print("\nStep 1: Parsing western resume...")
+        let sourceKind = ResumeSourceKind.from(url: inputURL)
         let text = try await ResumeInputReader.read(from: inputURL)
-        let western = Stages.parse(markdown: text)
+        let preprocessed = ResumeTextPreprocessor.preprocess(text, sourceKind: sourceKind)
+        let western = Stages.parse(text: preprocessed.cleanedText, sourceKind: sourceKind)
         print("  Found: \(western.experience.count) work entries, "
               + "\(western.education.count) education entries, "
               + "\(western.skills.count) skills")
@@ -91,16 +93,24 @@ struct ConvertCommand: AsyncParsableCommand {
         )
         let enc = JSONEncoder(); enc.outputFormatting = [.sortedKeys]
         let configData = try? enc.encode(japanConfig)
-        let inputsHash = ArtifactHashes.inputs(markdownContent: text, configData: configData)
+        let inputsHash = ArtifactHashes.inputs(markdownContent: preprocessed.cleanedText, configData: configData)
         let by = ProducedBy.jpresume()
 
-        let inputsData = InputsData(sourcePath: inputURL.path, markdownHash: inputsHash, config: japanConfig)
+        let inputsData = InputsData(
+            sourcePath: inputURL.path,
+            markdownHash: inputsHash,
+            config: japanConfig,
+            sourceKind: sourceKind,
+            sourceText: text,
+            cleanedText: preprocessed.cleanedText,
+            preprocessingNotes: preprocessed.notes
+        )
         try store.write(inputsData, kind: .inputs, contentHash: inputsHash, inputsHash: inputsHash, producedBy: by)
         try store.write(western, kind: .parsed, contentHash: inputsHash, inputsHash: inputsHash, producedBy: by)
 
         // Step 3: Normalize (with cache)
         print("\nStep 3: Normalizing resume...")
-        let normalized = try await resolveNormalized(store: store, western: western, config: japanConfig,
+        let normalized = try await resolveNormalized(store: store, western: western, inputs: inputsData, config: japanConfig,
                                                       inputsHash: inputsHash, producedBy: by)
 
         // Step 4: Validate
@@ -185,6 +195,7 @@ extension ConvertCommand {
     private func resolveNormalized(
         store: ArtifactStore,
         western: WesternResume,
+        inputs: InputsData,
         config: JapanConfig,
         inputsHash: String,
         producedBy: String
@@ -207,7 +218,7 @@ extension ConvertCommand {
         }
         let providerInstance = try ProviderFactory.create(provider: provider.rawValue, model: model)
         print("  Using AI provider: \(providerInstance.name)")
-        let result = try await Stages.normalize(western: western, config: config,
+        let result = try await Stages.normalize(western: western, inputs: inputs, config: config,
                                                 provider: providerInstance, verbose: verbose)
         try store.write(result, kind: .normalized, contentHash: inputsHash, inputsHash: inputsHash,
                         producedBy: ProducedBy.jpresume(providerSlug: provider.rawValue, modelOverride: model))

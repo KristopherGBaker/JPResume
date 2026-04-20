@@ -23,11 +23,12 @@ struct StepwiseCommandTests {
 
         let store = ArtifactStore(root: workspace)
         let inputs = InputsData(sourcePath: project.appendingPathComponent("resume.md").path,
-                                markdownHash: inputsHash, config: cfg)
+                                markdownHash: inputsHash, config: cfg,
+                                sourceKind: .markdown, sourceText: md, cleanedText: md)
         try store.write(inputs, kind: .inputs, contentHash: inputsHash, inputsHash: inputsHash,
                         producedBy: "jpresume/test")
 
-        let western = Stages.parse(markdown: md)
+        let western = Stages.parse(text: md, sourceKind: .markdown)
         try store.write(western, kind: .parsed, contentHash: inputsHash, inputsHash: inputsHash,
                         producedBy: "jpresume/test")
         return (project, workspace, inputsHash)

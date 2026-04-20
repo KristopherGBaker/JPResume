@@ -69,15 +69,69 @@ struct ArtifactSummary: Sendable {
 
 // MARK: - InputsData
 
+enum ResumeSourceKind: String, Codable, Sendable {
+    case markdown
+    case pdf
+    case text
+
+    static func from(url: URL) -> ResumeSourceKind {
+        switch url.pathExtension.lowercased() {
+        case "md", "markdown":
+            return .markdown
+        case "pdf":
+            return .pdf
+        default:
+            return .text
+        }
+    }
+}
+
 struct InputsData: Codable, Sendable {
     let sourcePath: String
     let markdownHash: String
     let config: JapanConfig
+    let sourceKind: ResumeSourceKind?
+    let sourceText: String?
+    let cleanedText: String?
+    let preprocessingNotes: [String]
 
     enum CodingKeys: String, CodingKey {
         case config
         case sourcePath = "source_path"
         case markdownHash = "markdown_hash"
+        case sourceKind = "source_kind"
+        case sourceText = "source_text"
+        case cleanedText = "cleaned_text"
+        case preprocessingNotes = "preprocessing_notes"
+    }
+
+    init(
+        sourcePath: String,
+        markdownHash: String,
+        config: JapanConfig,
+        sourceKind: ResumeSourceKind? = nil,
+        sourceText: String? = nil,
+        cleanedText: String? = nil,
+        preprocessingNotes: [String] = []
+    ) {
+        self.sourcePath = sourcePath
+        self.markdownHash = markdownHash
+        self.config = config
+        self.sourceKind = sourceKind
+        self.sourceText = sourceText
+        self.cleanedText = cleanedText
+        self.preprocessingNotes = preprocessingNotes
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sourcePath = try container.decode(String.self, forKey: .sourcePath)
+        markdownHash = try container.decode(String.self, forKey: .markdownHash)
+        config = try container.decode(JapanConfig.self, forKey: .config)
+        sourceKind = try container.decodeIfPresent(ResumeSourceKind.self, forKey: .sourceKind)
+        sourceText = try container.decodeIfPresent(String.self, forKey: .sourceText)
+        cleanedText = try container.decodeIfPresent(String.self, forKey: .cleanedText)
+        preprocessingNotes = try container.decodeIfPresent([String].self, forKey: .preprocessingNotes) ?? []
     }
 }
 

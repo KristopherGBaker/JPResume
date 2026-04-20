@@ -106,7 +106,7 @@ struct PipelineTests {
 
         - Built things
         """
-        let result = Stages.parse(markdown: md)
+        let result = Stages.parse(text: md, sourceKind: .markdown)
         // Parser success is indicated by at least one of these being populated.
         let didAnything = result.name != nil
             || !result.experience.isEmpty
@@ -135,5 +135,21 @@ struct PipelineTests {
         let resume = NormalizedResume(name: nil)
         let result = Stages.validate(resume)
         #expect(result.issues.contains { $0.field == "name" })
+    }
+
+    @Test func inputsDataDecodesLegacyShape() throws {
+        let json = """
+        {
+          "source_path": "/tmp/resume.pdf",
+          "markdown_hash": "abc",
+          "config": {}
+        }
+        """
+        let data = Data(json.utf8)
+        let decoded = try JSONDecoder().decode(InputsData.self, from: data)
+        #expect(decoded.sourcePath == "/tmp/resume.pdf")
+        #expect(decoded.sourceKind == nil)
+        #expect(decoded.cleanedText == nil)
+        #expect(decoded.preprocessingNotes.isEmpty)
     }
 }

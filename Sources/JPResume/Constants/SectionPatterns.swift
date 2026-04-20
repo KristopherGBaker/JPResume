@@ -21,7 +21,7 @@ enum SectionClassifier {
         .skills: [
             "skills", "technical skills", "technologies", "competencies",
             "core competencies", "technical competencies",
-            "languages & platforms",
+            "languages & platforms", "core competency",
         ],
         .certifications: [
             "certifications", "certificates", "licenses",
