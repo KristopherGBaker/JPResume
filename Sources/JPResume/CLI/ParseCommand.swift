@@ -45,8 +45,7 @@ struct ParseCommand: AsyncParsableCommand {
         let japanConfig = try ConfigManager.loadOrPrompt(
             path: configURL, western: western, forceReconfigure: reconfigure
         )
-        let enc = JSONEncoder(); enc.outputFormatting = [.sortedKeys]
-        let configData = try? enc.encode(japanConfig)
+        let configData = try? JSONCoders.sorted.encode(japanConfig)
         let inputsHash = ArtifactHashes.inputs(markdownContent: preprocessed.cleanedText, configData: configData)
         let by = ProducedBy.jpresume()
 

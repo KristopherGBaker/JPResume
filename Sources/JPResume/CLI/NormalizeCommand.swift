@@ -46,7 +46,7 @@ struct NormalizeCommand: AsyncParsableCommand {
 
         if external {
             let system = SystemPrompts.normalization()
-            let enc = JSONEncoder(); enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let enc = JSONCoders.prettySorted
             let westernJSON = (try? enc.encode(parsedArtifact.data)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
             let configJSON = (try? enc.encode(inputsArtifact.data.config)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
             let sourceKind = inputsArtifact.data.sourceKind?.rawValue ?? "text"
