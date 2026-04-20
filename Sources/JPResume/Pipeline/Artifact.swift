@@ -4,7 +4,7 @@ import Foundation
 // MARK: - ArtifactWarning
 
 struct ArtifactWarning: Codable, Sendable {
-    let severity: String    // "info" | "warning" | "error"
+    let severity: Severity
     let field: String?
     let message: String
 }
