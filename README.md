@@ -6,7 +6,7 @@ Convert western-style resumes to Japanese format: 履歴書 (rirekisho) and 職�
 
 Homebrew (recommended):
 ```bash
-brew tap KristopherGBaker/tap && brew install jpresume
+brew install KristopherGBaker/tap/jpresume
 ```
 
 curl:
