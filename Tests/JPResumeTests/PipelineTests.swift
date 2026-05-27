@@ -84,9 +84,9 @@ struct PipelineTests {
     }
 
     @Test func producedByHandlesEmptyDefaultModel() {
-        // claude-cli has "" as default → omit the colon segment
-        #expect(ProducedBy.jpresume(providerSlug: "claude-cli", modelOverride: nil)
-                == "jpresume/\(ProducedBy.version) claude-cli")
+        // Unknown providers resolve to an empty model → omit the colon segment
+        #expect(ProducedBy.jpresume(providerSlug: "custom-runner", modelOverride: nil)
+                == "jpresume/\(ProducedBy.version) custom-runner")
     }
 
     @Test func producedByExternalFormat() {

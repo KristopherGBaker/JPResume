@@ -66,11 +66,11 @@ struct NormalizeCommand: AsyncParsableCommand {
 
         // Internal LLM call
         print("Normalizing resume...")
-        let providerInstance = try ProviderFactory.create(provider: provider.rawValue, model: model)
-        print("  Using AI provider: \(providerInstance.name)")
+        let chatModel = try ProviderFactory.create(provider: provider.rawValue, model: model, temperature: 0.2)
+        print("  Using AI provider: \(ProviderFactory.label(provider: provider.rawValue, model: model))")
         let normalized = try await Stages.normalize(
             western: parsedArtifact.data, inputs: inputsArtifact.data, config: inputsArtifact.data.config,
-            provider: providerInstance, verbose: verbose
+            model: chatModel, verbose: verbose
         )
         try store.write(normalized, kind: .normalized, contentHash: inputsHash, inputsHash: inputsHash,
                         producedBy: ProducedBy.jpresume(providerSlug: provider.rawValue, modelOverride: model))

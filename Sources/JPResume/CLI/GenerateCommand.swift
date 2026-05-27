@@ -101,11 +101,11 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
 
         // Internal LLM call
         print("Generating 履歴書\(targetContext != nil ? " (targeted)" : "")...")
-        let providerInstance = try ProviderFactory.create(provider: provider.rawValue, model: model)
-        print("  Using AI provider: \(providerInstance.name)")
+        let chatModel = try ProviderFactory.create(provider: provider.rawValue, model: model, temperature: 0.3)
+        print("  Using AI provider: \(ProviderFactory.label(provider: provider.rawValue, model: model))")
         var rirekishoData = try await Stages.generateRirekisho(
             repaired: repaired, config: inputsArtifact.data.config, era: era,
-            targetContext: targetContext, provider: providerInstance, verbose: verbose
+            targetContext: targetContext, model: chatModel, verbose: verbose
         )
         rirekishoData = Stages.polish(rirekishoData, derived: repaired.derivedExperience)
         try store.write(rirekishoData, kind: .rirekisho, contentHash: contentHash, inputsHash: inputsHash,
@@ -216,11 +216,11 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
 
         // Internal LLM call
         print("Generating 職務経歴書\(targetContext != nil ? " (targeted)" : "")...")
-        let providerInstance = try ProviderFactory.create(provider: provider.rawValue, model: model)
-        print("  Using AI provider: \(providerInstance.name)")
+        let chatModel = try ProviderFactory.create(provider: provider.rawValue, model: model, temperature: 0.3)
+        print("  Using AI provider: \(ProviderFactory.label(provider: provider.rawValue, model: model))")
         var shokumuData = try await Stages.generateShokumukeirekisho(
             repaired: repaired, config: inputsArtifact.data.config, era: era,
-            options: genOptions, targetContext: targetContext, provider: providerInstance, verbose: verbose
+            options: genOptions, targetContext: targetContext, model: chatModel, verbose: verbose
         )
         shokumuData = Stages.polish(shokumuData, derived: repaired.derivedExperience)
         try store.write(shokumuData, kind: .shokumukeirekisho, contentHash: contentHash, inputsHash: inputsHash,
