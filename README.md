@@ -35,7 +35,7 @@ Then ask your agent: *"Help me create a Japanese resume from my resume.md"*
 **One-shot CLI:**
 
 ```bash
-jpresume convert resume.md --provider claude-cli --format both
+jpresume convert resume.md --provider anthropic --format both
 ```
 
 ## Features
@@ -46,7 +46,7 @@ jpresume convert resume.md --provider claude-cli --format both
 - Validation — date ranges, overlapping roles, `is_current` consistency, total experience
 - Interactive Japan-specific config — kanji name, furigana, education dates, work history, licenses — saved to YAML for reuse
 - Tailored applications — `--target company.json` adjusts 志望動機, 職務要約, 自己PR, and role emphasis for a specific employer
-- Multi-provider AI — Anthropic, OpenAI, OpenRouter, Ollama, Claude CLI, Codex CLI
+- Multi-provider AI — Anthropic, OpenAI, OpenRouter, Ollama (via Shikisha)
 - Content-based caching — SHA-256 hash invalidation across all inputs
 - PDF output — 履歴書 as a standard grid form (CoreGraphics + Hiragino Sans); 職務経歴書 as a free-form document
 - Stepwise subcommands — pause, review, and hand-edit between any stage

@@ -11,7 +11,7 @@ Tool: `jpresume` (Swift CLI from the JPResume repo; typically installed at `/usr
 
 ## Core principles
 
-1. **External mode by default.** You produce the JSON for `normalize`, `generate rirekisho`, and `generate shokumukeirekisho`. Don't route through `--provider claude-cli` unless the user asks for autonomous/batch. Rationale: you can inspect the prompt, reason about edge cases, and fix mistakes without a round-trip to another CLI.
+1. **External mode by default.** You produce the JSON for `normalize`, `generate rirekisho`, and `generate shokumukeirekisho`. Don't route through `--provider anthropic` (or another API provider) unless the user asks for autonomous/batch. Rationale: you can inspect the prompt, reason about edge cases, and fix mistakes without a round-trip to another model.
 2. **Pause after validate.** Run parse → normalize → repair → validate automatically. Stop there, surface warnings to the user, fix issues (either by editing `normalized.json` or asking the user for ground truth), then continue to generate + render after confirmation.
 3. **Never fabricate.** Dates, employers, titles, and achievements must come from the source resume text or `jpresume_config.yaml`. If something is missing, ask. The normalizer's system prompt is explicit about this — follow it.
 4. **Ground-truth from config.** `jpresume_config.yaml` (kanji name, furigana, address, education/work timelines, certifications) is authoritative. The source resume text is secondary for dates when the config disagrees.
@@ -38,7 +38,7 @@ Before the first stage:
 | Mode | Use when | How |
 |------|----------|-----|
 | **External (default)** | Collaborating live with the user | `jpresume <stage> --external`, you produce JSON, `--ingest` reads it |
-| **Internal (provider)** | User asks to "just run it" or wants a one-shot from CI | `jpresume convert resume.md --provider claude-cli --format both` |
+| **Internal (provider)** | User asks to "just run it" or wants a one-shot from CI | `jpresume convert resume.md --provider anthropic --format both` |
 | **Hybrid** | Some stages external, some internal | Mix on a per-stage basis |
 
 ## External-mode protocol

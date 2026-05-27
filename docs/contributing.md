@@ -27,7 +27,7 @@ Or directly:
 
 ```bash
 swift build
-swift run jpresume convert examples/resume.md --provider claude-cli --format both
+swift run jpresume convert examples/resume.md --provider anthropic --format both
 swift run jpresume convert examples/resume.md --dry-run
 ```
 

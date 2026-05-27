@@ -46,11 +46,11 @@ When present, 志望動機, 職務要約, 自己PR, and role/achievement emphasi
 | Provider | Flag | API key env var | Notes |
 |----------|------|-----------------|-------|
 | Ollama | `--provider ollama` | — | Local, default |
-| Claude CLI | `--provider claude-cli` | — | Uses `claude -p` |
-| Codex CLI | `--provider codex-cli` | — | Uses `codex exec` |
 | OpenRouter | `--provider openrouter` | `OPENROUTER_API_KEY` | |
 | OpenAI | `--provider openai` | `OPENAI_API_KEY` | |
 | Anthropic | `--provider anthropic` | `ANTHROPIC_API_KEY` | |
+
+Provider transport is handled by [Shikisha](https://github.com/KristopherGBaker/Shikisha).
 
 ## Pipeline
 

@@ -109,7 +109,7 @@ Common decoder errors:
 If external mode is failing repeatedly (e.g. stuck on some schema detail), you can fall back to internal mode for that one stage:
 
 ```bash
-jpresume <stage> --workspace <ws> --provider claude-cli
+jpresume <stage> --workspace <ws> --provider anthropic
 ```
 
-This shells out to `claude -p` with the same prompts. Useful as an escape hatch but loses the interactive review benefit.
+This calls the Anthropic API directly with the same prompts. Useful as an escape hatch but loses the interactive review benefit.
