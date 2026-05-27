@@ -53,7 +53,7 @@ struct StepwiseCommandTests {
         return repaired
     }
 
-    /// Minimal JSON for a NormalizedResume that round-trips through JSONExtractor + JSONDecoder.
+    /// Minimal JSON for a NormalizedResume that round-trips through the ingest path.
     private func cannedNormalizedJSON() throws -> String {
         let resume = NormalizedResume(
             name: "Canned",
