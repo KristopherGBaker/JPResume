@@ -114,7 +114,7 @@ enum ExternalBridge {
     ) throws {
         let raw = try readResponse(stage: stage, workspace: workspace)
         do {
-            let jsonData = try JSONExtractor.extract(from: raw)
+            let jsonData = try extractJSON(from: raw)
             let decoded = try JSONDecoder().decode(T.self, from: jsonData)
             let final = transform(decoded)
             let by = ProducedBy.external(model: model ?? "external")
@@ -167,4 +167,54 @@ enum ExternalBridgeError: Error, CustomStringConvertible {
             return "Failed to parse AI response: \(msg)"
         }
     }
+}
+
+// MARK: - JSON extraction
+
+/// Extract the first valid JSON object from an external agent's response. Tolerates a
+/// markdown code fence around the object and a brace-matched object embedded in prose.
+/// External agents (humans, other LLMs) routinely emit either shape; the LLM path
+/// hits Shikisha's `asStructuredOutput` which already strips fences.
+private func extractJSON(from text: String) throws -> Data {
+    let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    // Code-fence form: ```json\n{...}\n```
+    if cleaned.contains("```") {
+        let parts = cleaned.components(separatedBy: "```")
+        for part in parts.dropFirst() {
+            var content = part.trimmingCharacters(in: .whitespacesAndNewlines)
+            if content.hasPrefix("json") || content.hasPrefix("JSON") {
+                content = String(content.drop(while: { $0 != "\n" }).dropFirst())
+            }
+            content = content.trimmingCharacters(in: .whitespacesAndNewlines)
+            if content.hasPrefix("{"),
+               let data = content.data(using: .utf8),
+               (try? JSONSerialization.jsonObject(with: data)) != nil {
+                return data
+            }
+        }
+    }
+
+    // Direct JSON
+    if let data = cleaned.data(using: .utf8),
+       (try? JSONSerialization.jsonObject(with: data)) != nil {
+        return data
+    }
+
+    // Brace-match fallback
+    guard let startIdx = cleaned.firstIndex(of: "{") else {
+        throw ExternalBridgeError.parseError(String(cleaned.prefix(200)))
+    }
+    var depth = 0
+    for (i, ch) in cleaned[startIdx...].enumerated() {
+        if ch == "{" { depth += 1 } else if ch == "}" {
+            depth -= 1
+            if depth == 0 {
+                let endOffset = cleaned.index(startIdx, offsetBy: i + 1)
+                let jsonStr = String(cleaned[startIdx..<endOffset])
+                if let data = jsonStr.data(using: .utf8) { return data }
+            }
+        }
+    }
+    throw ExternalBridgeError.parseError(String(cleaned.prefix(200)))
 }

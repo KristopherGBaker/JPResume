@@ -214,10 +214,10 @@ extension ConvertCommand {
                 return legacy
             }
         }
-        let providerInstance = try ProviderFactory.create(provider: provider.rawValue, model: model)
-        print("  Using AI provider: \(providerInstance.name)")
+        let chatModel = try ProviderFactory.create(provider: provider.rawValue, model: model, temperature: 0.2)
+        print("  Using AI provider: \(ProviderFactory.label(provider: provider.rawValue, model: model))")
         let result = try await Stages.normalize(western: western, inputs: inputs, config: config,
-                                                provider: providerInstance, verbose: verbose)
+                                                model: chatModel, verbose: verbose)
         try store.write(result, kind: .normalized, contentHash: inputsHash, inputsHash: inputsHash,
                         producedBy: ProducedBy.jpresume(providerSlug: provider.rawValue, modelOverride: model))
         return result
@@ -274,21 +274,21 @@ extension ConvertCommand {
 
         let needsAI = (generateR && rirekishoData == nil) || (generateS && shokumuData == nil)
         if needsAI {
-            let providerInstance = try ProviderFactory.create(provider: provider.rawValue, model: model)
-            print("  Using AI provider: \(providerInstance.name)")
+            let chatModel = try ProviderFactory.create(provider: provider.rawValue, model: model, temperature: 0.3)
+            print("  Using AI provider: \(ProviderFactory.label(provider: provider.rawValue, model: model))")
 
             if generateR && rirekishoData == nil {
                 print("  Generating 履歴書...")
                 rirekishoData = try await Stages.generateRirekisho(
                     repaired: repaired, config: config, era: era, targetContext: targetContext,
-                    provider: providerInstance, verbose: verbose
+                    model: chatModel, verbose: verbose
                 )
             }
             if generateS && shokumuData == nil {
                 print("  Generating 職務経歴書...")
                 shokumuData = try await Stages.generateShokumukeirekisho(
                     repaired: repaired, config: config, era: era, options: genOptions,
-                    targetContext: targetContext, provider: providerInstance, verbose: verbose
+                    targetContext: targetContext, model: chatModel, verbose: verbose
                 )
             }
         }
@@ -352,8 +352,6 @@ enum OutputFormat: String, ExpressibleByArgument, Sendable {
 
 enum ProviderChoice: String, ExpressibleByArgument, Sendable {
     case anthropic, openai, openrouter, ollama
-    case claudeCli = "claude-cli"
-    case codexCli = "codex-cli"
 }
 
 enum EraStyle: String, ExpressibleByArgument, Sendable {
