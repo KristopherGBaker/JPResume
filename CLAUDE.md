@@ -18,7 +18,7 @@ make install                   # build release + copy to /usr/local/bin
 make bootstrap                 # mint bootstrap (install tools from Mintfile)
 swift run jpresume --help      # run CLI
 swift run jpresume convert examples/resume.md --dry-run  # parse + normalize only, prints both
-swift run jpresume convert examples/Kristopher_Baker_Resume.md --provider claude-cli --format both
+swift run jpresume convert examples/Kristopher_Baker_Resume.md --provider anthropic --format both
 ```
 
 ## CLI surface
