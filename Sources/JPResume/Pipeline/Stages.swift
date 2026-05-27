@@ -1,4 +1,5 @@
 import Foundation
+import Shikisha
 
 /// Stateless wrappers over existing pipeline functions.
 /// Commands call these; no orchestration logic lives here.
@@ -21,10 +22,10 @@ enum Stages {
         western: WesternResume,
         inputs: InputsData,
         config: JapanConfig,
-        provider: any AIProvider,
+        model: any ChatModel,
         verbose: Bool
     ) async throws -> NormalizedResume {
-        let normalizer = ResumeNormalizer(provider: provider, verbose: verbose)
+        let normalizer = ResumeNormalizer(model: model, verbose: verbose)
         return try await normalizer.normalize(western: western, inputs: inputs, config: config)
     }
 
@@ -47,10 +48,10 @@ enum Stages {
         config: JapanConfig,
         era: EraStyle,
         targetContext: TargetCompanyContext? = nil,
-        provider: any AIProvider,
+        model: any ChatModel,
         verbose: Bool
     ) async throws -> RirekishoData {
-        let ai = ResumeAI(provider: provider, verbose: verbose)
+        let ai = ResumeAI(model: model, verbose: verbose)
         return try await ai.generateRirekisho(normalized: repaired, config: config, era: era,
                                                targetContext: targetContext)
     }
@@ -61,10 +62,10 @@ enum Stages {
         era: EraStyle,
         options: GenerationOptions,
         targetContext: TargetCompanyContext? = nil,
-        provider: any AIProvider,
+        model: any ChatModel,
         verbose: Bool
     ) async throws -> ShokumukeirekishoData {
-        let ai = ResumeAI(provider: provider, verbose: verbose)
+        let ai = ResumeAI(model: model, verbose: verbose)
         return try await ai.generateShokumukeirekisho(normalized: repaired, config: config, era: era,
                                                        options: options, targetContext: targetContext)
     }

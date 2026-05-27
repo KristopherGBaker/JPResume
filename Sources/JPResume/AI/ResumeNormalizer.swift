@@ -1,7 +1,8 @@
 import Foundation
+import Shikisha
 
 struct ResumeNormalizer: Sendable {
-    let provider: any AIProvider
+    let model: any ChatModel
     let verbose: Bool
 
     func normalize(western: WesternResume, inputs: InputsData, config: JapanConfig) async throws -> NormalizedResume {
@@ -15,21 +16,15 @@ struct ResumeNormalizer: Sendable {
 
         // First attempt
         do {
-            let response = try await provider.chat(system: system, user: user, temperature: 0.2)
-            if verbose { print("  [Normalizer] Response (\(response.count) chars)") }
-            let data = try JSONExtractor.extract(from: response)
-            return try JSONDecoder().decode(NormalizedResume.self, from: data)
+            return try await decode(system: system, user: user)
         } catch {
             if verbose { print("  [Normalizer] First attempt failed: \(error). Retrying...") }
         }
 
-        // Retry with error context
+        // Retry with stricter instruction
         do {
             let retryUser = user + "\n\nNOTE: Your previous response failed to parse. Return strictly valid JSON with no extra text."
-            let response = try await provider.chat(system: system, user: retryUser, temperature: 0.1)
-            if verbose { print("  [Normalizer] Retry response (\(response.count) chars)") }
-            let data = try JSONExtractor.extract(from: response)
-            return try JSONDecoder().decode(NormalizedResume.self, from: data)
+            return try await decode(system: system, user: retryUser)
         } catch {
             if verbose { print("  [Normalizer] Retry failed: \(error). Using deterministic fallback.") }
         }
@@ -40,6 +35,13 @@ struct ResumeNormalizer: Sendable {
     }
 
     // MARK: - Private
+
+    private func decode(system: String, user: String) async throws -> NormalizedResume {
+        let messages: [any Message] = [SystemMessage(content: system), HumanMessage(content: user)]
+        let result = try await ChatModelDecoder.decode(NormalizedResume.self, model: model, messages: messages)
+        if verbose { print("  [Normalizer] Decoded normalized resume") }
+        return result
+    }
 
     /// Build a NormalizedResume from WesternResume without any LLM call.
     /// Dates are parsed with simple regex. All bullets are classified as responsibilities.
