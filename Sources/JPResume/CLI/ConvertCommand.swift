@@ -299,9 +299,12 @@ extension ConvertCommand {
             }
             if generateS && shokumuData == nil {
                 print("  Generating 職務経歴書...")
+                let naming = rirekishoData.map { NamingContext.from($0) }
+                if naming != nil && verbose { print("  [Naming] Reusing names from rirekisho output") }
                 let s = try await Stages.generateShokumukeirekisho(
                     repaired: repaired, config: config, era: era, options: genOptions,
-                    targetContext: targetContext, model: chatModel, verbose: verbose
+                    targetContext: targetContext, namingContext: naming,
+                    model: chatModel, verbose: verbose
                 )
                 shokumuData = s.data
                 shokumuWarnings = s.asArtifactWarnings
