@@ -61,6 +61,7 @@ struct ConvertCommand: AsyncParsableCommand {
     @Option(help: "Path to target-company context JSON file (enables tailored application mode)")
     var target: String?
 
+    // swiftlint:disable:next function_body_length
     func run() async throws {
         let inputURL = URL(fileURLWithPath: input)
         guard FileManager.default.fileExists(atPath: inputURL.path) else {
@@ -160,7 +161,7 @@ struct ConvertCommand: AsyncParsableCommand {
                                                       options: genOptions, targetContext: targetContext)
 
         print("\nStep 5: Translating and adapting with AI\(targetContext != nil ? " (targeted)" : "")...")
-        let (rirekishoData, shokumukeirekishoData) = try await resolveJPData(
+        let jpResult = try await resolveJPData(
             store: store, repaired: repaired, config: japanConfig, genOptions: genOptions,
             targetContext: targetContext, inputsHash: inputsHash, rirekishoHash: rHash,
             shokumuHash: sHash, producedBy: by
@@ -168,20 +169,28 @@ struct ConvertCommand: AsyncParsableCommand {
 
         // Step 5b: Polish
         let derived = repaired.derivedExperience
-        let polishedRirekisho = rirekishoData.map { Stages.polish($0, derived: derived) }
-        let polishedShokumu = shokumukeirekishoData.map { Stages.polish($0, derived: derived) }
+        let polishedRirekisho = jpResult.rirekisho.map { Stages.polish($0, derived: derived) }
+        let polishedShokumu = jpResult.shokumukeirekisho.map { Stages.polish($0, derived: derived) }
 
         if let r = polishedRirekisho {
-            try store.write(r, kind: .rirekisho, contentHash: rHash, inputsHash: inputsHash, producedBy: by)
+            try store.write(r, kind: .rirekisho, contentHash: rHash, inputsHash: inputsHash,
+                            producedBy: by, warnings: jpResult.rirekishoWarnings)
         }
         if let s = polishedShokumu {
-            try store.write(s, kind: .shokumukeirekisho, contentHash: sHash, inputsHash: inputsHash, producedBy: by)
+            try store.write(s, kind: .shokumukeirekisho, contentHash: sHash, inputsHash: inputsHash,
+                            producedBy: by, warnings: jpResult.shokumuWarnings)
         }
 
         // Step 6: Render
         print("\nStep 6: Generating output files...")
         try FileManager.default.createDirectory(at: outputURL, withIntermediateDirectories: true)
         try renderOutput(rirekisho: polishedRirekisho, shokumukeirekisho: polishedShokumu, to: outputURL)
+
+        let leftover = jpResult.rirekishoWarnings.count + jpResult.shokumuWarnings.count
+        if leftover > 0 {
+            print("\n⚠️  \(leftover) constraint warning(s) attached to artifacts. " +
+                  "Run 'jpresume inspect --workspace \(workspaceURL.path)' to see them.")
+        }
 
         print("\nDone! Workspace: \(workspaceURL.path)")
     }
@@ -234,12 +243,14 @@ extension ConvertCommand {
         rirekishoHash: String,
         shokumuHash: String,
         producedBy: String
-    ) async throws -> (RirekishoData?, ShokumukeirekishoData?) {
+    ) async throws -> JPDataResult {
         let generateR = !shokumukeirekishoOnly
         let generateS = !rirekishoOnly
 
         var rirekishoData: RirekishoData?
         var shokumuData: ShokumukeirekishoData?
+        var rirekishoWarnings: [ArtifactWarning] = []
+        var shokumuWarnings: [ArtifactWarning] = []
 
         if generateR && !noCache {
             if store.status(.rirekisho, expectedContentHash: rirekishoHash) == .fresh,
@@ -279,21 +290,28 @@ extension ConvertCommand {
 
             if generateR && rirekishoData == nil {
                 print("  Generating 履歴書...")
-                rirekishoData = try await Stages.generateRirekisho(
+                let r = try await Stages.generateRirekisho(
                     repaired: repaired, config: config, era: era, targetContext: targetContext,
                     model: chatModel, verbose: verbose
                 )
+                rirekishoData = r.data
+                rirekishoWarnings = r.asArtifactWarnings
             }
             if generateS && shokumuData == nil {
                 print("  Generating 職務経歴書...")
-                shokumuData = try await Stages.generateShokumukeirekisho(
+                let s = try await Stages.generateShokumukeirekisho(
                     repaired: repaired, config: config, era: era, options: genOptions,
                     targetContext: targetContext, model: chatModel, verbose: verbose
                 )
+                shokumuData = s.data
+                shokumuWarnings = s.asArtifactWarnings
             }
         }
 
-        return (rirekishoData, shokumuData)
+        return JPDataResult(
+            rirekisho: rirekishoData, shokumukeirekisho: shokumuData,
+            rirekishoWarnings: rirekishoWarnings, shokumuWarnings: shokumuWarnings
+        )
     }
 
     private func renderOutput(
@@ -342,6 +360,18 @@ extension ConvertCommand {
             if derived.hasInternationalTeamExperience { print("  Derived: international team experience detected") }
         }
     }
+}
+
+// MARK: - JPDataResult
+
+/// Bundle returned by `resolveJPData` — keeps the polished JP artifacts together with the
+/// critique warnings that survived the self-critique loop, so the caller can stamp them
+/// onto the artifact at write time.
+struct JPDataResult {
+    let rirekisho: RirekishoData?
+    let shokumukeirekisho: ShokumukeirekishoData?
+    let rirekishoWarnings: [ArtifactWarning]
+    let shokumuWarnings: [ArtifactWarning]
 }
 
 // MARK: - Enums

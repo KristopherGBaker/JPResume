@@ -49,9 +49,10 @@ enum Stages {
         era: EraStyle,
         targetContext: TargetCompanyContext? = nil,
         model: any ChatModel,
-        verbose: Bool
-    ) async throws -> RirekishoData {
-        let ai = ResumeAI(model: model, verbose: verbose)
+        verbose: Bool,
+        maxCritiquePasses: Int = 3
+    ) async throws -> GenerationResult<RirekishoData> {
+        let ai = ResumeAI(model: model, verbose: verbose, maxCritiquePasses: maxCritiquePasses)
         return try await ai.generateRirekisho(normalized: repaired, config: config, era: era,
                                                targetContext: targetContext)
     }
@@ -63,9 +64,10 @@ enum Stages {
         options: GenerationOptions,
         targetContext: TargetCompanyContext? = nil,
         model: any ChatModel,
-        verbose: Bool
-    ) async throws -> ShokumukeirekishoData {
-        let ai = ResumeAI(model: model, verbose: verbose)
+        verbose: Bool,
+        maxCritiquePasses: Int = 3
+    ) async throws -> GenerationResult<ShokumukeirekishoData> {
+        let ai = ResumeAI(model: model, verbose: verbose, maxCritiquePasses: maxCritiquePasses)
         return try await ai.generateShokumukeirekisho(normalized: repaired, config: config, era: era,
                                                        options: options, targetContext: targetContext)
     }

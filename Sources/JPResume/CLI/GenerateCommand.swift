@@ -103,13 +103,14 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
         print("Generating 履歴書\(targetContext != nil ? " (targeted)" : "")...")
         let chatModel = try ProviderFactory.create(provider: provider.rawValue, model: model, temperature: 0.3)
         print("  Using AI provider: \(ProviderFactory.label(provider: provider.rawValue, model: model))")
-        var rirekishoData = try await Stages.generateRirekisho(
+        let result = try await Stages.generateRirekisho(
             repaired: repaired, config: inputsArtifact.data.config, era: era,
             targetContext: targetContext, model: chatModel, verbose: verbose
         )
-        rirekishoData = Stages.polish(rirekishoData, derived: repaired.derivedExperience)
-        try store.write(rirekishoData, kind: .rirekisho, contentHash: contentHash, inputsHash: inputsHash,
-                        producedBy: ProducedBy.jpresume(providerSlug: provider.rawValue, modelOverride: model))
+        let polished = Stages.polish(result.data, derived: repaired.derivedExperience)
+        try store.write(polished, kind: .rirekisho, contentHash: contentHash, inputsHash: inputsHash,
+                        producedBy: ProducedBy.jpresume(providerSlug: provider.rawValue, modelOverride: model),
+                        warnings: result.asArtifactWarnings)
         print("  ✓ \(workspaceURL.path)/rirekisho.json")
     }
 }
@@ -218,13 +219,14 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
         print("Generating 職務経歴書\(targetContext != nil ? " (targeted)" : "")...")
         let chatModel = try ProviderFactory.create(provider: provider.rawValue, model: model, temperature: 0.3)
         print("  Using AI provider: \(ProviderFactory.label(provider: provider.rawValue, model: model))")
-        var shokumuData = try await Stages.generateShokumukeirekisho(
+        let result = try await Stages.generateShokumukeirekisho(
             repaired: repaired, config: inputsArtifact.data.config, era: era,
             options: genOptions, targetContext: targetContext, model: chatModel, verbose: verbose
         )
-        shokumuData = Stages.polish(shokumuData, derived: repaired.derivedExperience)
-        try store.write(shokumuData, kind: .shokumukeirekisho, contentHash: contentHash, inputsHash: inputsHash,
-                        producedBy: ProducedBy.jpresume(providerSlug: provider.rawValue, modelOverride: model))
+        let polished = Stages.polish(result.data, derived: repaired.derivedExperience)
+        try store.write(polished, kind: .shokumukeirekisho, contentHash: contentHash, inputsHash: inputsHash,
+                        producedBy: ProducedBy.jpresume(providerSlug: provider.rawValue, modelOverride: model),
+                        warnings: result.asArtifactWarnings)
         print("  ✓ \(workspaceURL.path)/shokumukeirekisho.json")
     }
 }
