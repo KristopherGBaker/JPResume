@@ -17,10 +17,14 @@ Options:
   --model MODEL                 Model name override
   --era {western,japanese}      Date format: 2024年3月 vs 令和6年3月 (default: western)
   --target PATH                 Target-company context JSON (tailored application mode)
+  --notes PATH-OR-TEXT          Free-form supplementary context (extra work/education
+                                history, style preferences). Auto-detects file path
+                                vs inline text. Folds into the inputs hash.
   --no-cache                    Ignore cached output and regenerate
   --strict                      Treat validation warnings as errors
   --dry-run                     Parse + normalize only, print both and exit
-  -v, --verbose                 Show AI prompts and responses
+  -v, --verbose                 Show AI prompts/responses + critique pass counter +
+                                feedback-loop accept/revert decisions
 ```
 
 ### Target-company context (`--target`)
@@ -40,6 +44,29 @@ Pass a JSON file to switch from neutral master-document mode to tailored applica
 ```
 
 When present, 志望動機, 職務要約, 自己PR, and role/achievement emphasis are adjusted toward the target — using only facts from the input, never fabricating. Changing the file invalidates the artifact cache.
+
+### Free-form notes (`--notes`)
+
+Pass extra context the LLM should know but doesn't have elsewhere — e.g. extended work or education history not on the western resume, style or emphasis preferences, corrections to ambiguous content. The flag accepts either a file path or inline text:
+
+```bash
+# Inline (best for one-line instructions)
+jpresume convert resume.md --notes "Emphasize my iOS work over backend."
+
+# File (best for multi-paragraph extras)
+jpresume convert resume.md --notes notes/extras.md
+```
+
+Notes reach every LLM stage as `additional_context` in the user payload. The system prompts treat them as authoritative supplementary input — extra entries merge into experience/education; style guidance applies to tone — but never override `japan_config` on conflicts and never license fabrication. Notes fold into the inputs hash so editing them invalidates every downstream artifact (normalize, repair, both generate stages).
+
+## Orchestration loops (one-shot quality)
+
+`convert` runs two extra loops to narrow the gap with the interactive agent flow:
+
+- **Validation feedback** (normalize) — after initial normalize, runs the validator; if issues exist, re-prompts with the validation output as context. Accepts only when issue count strictly decreases. Capped at 2 refinement passes.
+- **Self-critique** (each generate) — after initial rirekisho/shokumukeirekisho generation, runs `JapaneseConstraintChecker` (forbidden hype phrases like 「即戦力として貢献」, 「現在」 placement in date column, duplicate first sentences between 職務要約 and 自己PR, metrics duplicated across sections, etc.). On violations, hands the current JSON + violation list back to the LLM for repair. Capped at 3 critique passes. Surviving violations are stamped onto the artifact as warnings (visible via `jpresume inspect`).
+
+A clean run is 3 LLM calls. Worst case is ~11. Pass `--verbose` to see the per-loop pass counter and accept/revert decisions live.
 
 ## AI providers
 
