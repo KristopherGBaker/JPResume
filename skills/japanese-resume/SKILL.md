@@ -41,6 +41,19 @@ Before the first stage:
 | **Internal (provider)** | User asks to "just run it" or wants a one-shot from CI | `jpresume convert resume.md --provider anthropic --format both` |
 | **Hybrid** | Some stages external, some internal | Mix on a per-stage basis |
 
+Internal mode is no longer a "no review" trap — `convert` runs a validation feedback loop on normalize (up to 2 refinement passes, oscillation guard) and a self-critique loop on each generate stage (up to 3 critique passes against the `JapaneseConstraintChecker` rules). Surviving constraint violations are stamped onto the artifact as warnings, visible in `jpresume inspect`. External mode still wins for edge-case judgment calls (the soft-skill tone of 自己PR, choosing between two valid naming options, breaking date conflicts with no clear ground-truth) — those are inherent ceiling on automation.
+
+### Supplementary user context (`--notes`)
+
+If the user mentions facts not present in the resume or `jpresume_config.yaml` — extra contract roles, side projects worth including, prior education they want listed, or stylistic preferences — pass them via `--notes`:
+
+```bash
+jpresume convert resume.md --notes "I also did a 2008-2010 contract role at PrototypeCo as an iOS developer."
+jpresume convert resume.md --notes notes/extras.md
+```
+
+The flag accepts either a file path or inline text. Notes flow into every LLM stage as `additional_context` and fold into the inputs hash (so editing them invalidates the cache). Use this when the user has extra info that doesn't fit cleanly in `work_japanese` / `education_japanese` config fields — for one-off context, freeform notes are friction-free; for structured timeline additions the candidate plans to reuse, prefer editing `jpresume_config.yaml` so it persists across projects.
+
 ## External-mode protocol
 
 Every LLM stage (`normalize`, `generate rirekisho`, `generate shokumukeirekisho`) uses the same three-step pattern. Full details in [references/external-mode.md](references/external-mode.md).
@@ -222,7 +235,7 @@ jpresume inspect <artifact> --workspace <ws> --json # raw artifact dump
 
 ## Anti-patterns to avoid
 
-- **Running `convert` when the user wants interactive review.** `convert` does the full pipeline internally with one provider call per LLM stage — no pauses. Use stepwise for review flows.
+- **Running `convert` when the user wants interactive review.** Even with the validation feedback + self-critique loops, `convert` doesn't pause for human judgment on low-confidence dates, ambiguous overlaps, or 自己PR tone. Use stepwise when the user wants to confirm warnings before generating, or wants to iterate on Japanese phrasing. Use `convert` when the user says "just run it," for batch/CI, or for a quick first draft they'll refine in stepwise after.
 - **Editing `repaired.json` or `validation.json`.** They're `role: "derived"`. Edits are overwritten on next run. Edit `normalized.json` instead.
 - **Skipping repair.** `generate` strictly requires `repaired.json`; it refuses to fall back to `normalized.json` to keep the review loop intact. If you see "run 'jpresume repair' first", run it.
 - **Fabricating Japanese text.** Kanji for names, addresses, and furigana come from the config. If a field is missing from config, ask; don't invent.
