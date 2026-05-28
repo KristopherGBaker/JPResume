@@ -247,6 +247,20 @@ func loadRirekishoNamingContext(store: ArtifactStore) -> NamingContext? {
     return NamingContext.from(artifact.data)
 }
 
+/// Resolve a `--notes` value: if the argument matches an existing file path, read its
+/// contents; otherwise treat it as inline text. Returns nil for nil input or empty
+/// resolved text so downstream callers can branch cleanly.
+func resolveNotes(_ value: String?) throws -> String? {
+    guard let v = value, !v.isEmpty else { return nil }
+    if FileManager.default.fileExists(atPath: v) {
+        let contents = try String(contentsOfFile: v, encoding: .utf8)
+        let trimmed = contents.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+    let trimmed = v.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
+}
+
 func loadTargetContext(_ path: String?) throws -> TargetCompanyContext? {
     guard let path else { return nil }
     let url = URL(fileURLWithPath: path)

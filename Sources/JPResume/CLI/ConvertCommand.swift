@@ -61,6 +61,13 @@ struct ConvertCommand: AsyncParsableCommand {
     @Option(help: "Path to target-company context JSON file (enables tailored application mode)")
     var target: String?
 
+    @Option(help: """
+    Free-form notes for the LLM (extra work/education history, style preferences, etc). \
+    Accepts either a path to a text/markdown file or inline text. Folds into the inputs \
+    hash so changes invalidate the workspace cache.
+    """)
+    var notes: String?
+
     // swiftlint:disable:next function_body_length
     func run() async throws {
         let inputURL = URL(fileURLWithPath: input)
@@ -92,8 +99,10 @@ struct ConvertCommand: AsyncParsableCommand {
         let japanConfig = try ConfigManager.loadOrPrompt(
             path: configURL, western: western, forceReconfigure: reconfigure
         )
+        let resolvedNotes = try resolveNotes(notes)
         let configData = try? JSONCoders.sorted.encode(japanConfig)
-        let inputsHash = ArtifactHashes.inputs(markdownContent: preprocessed.cleanedText, configData: configData)
+        let inputsHash = ArtifactHashes.inputs(markdownContent: preprocessed.cleanedText,
+                                                configData: configData, notes: resolvedNotes)
         let by = ProducedBy.jpresume()
 
         let inputsData = InputsData(
@@ -103,7 +112,8 @@ struct ConvertCommand: AsyncParsableCommand {
             sourceKind: sourceKind,
             sourceText: text,
             cleanedText: preprocessed.cleanedText,
-            preprocessingNotes: preprocessed.notes
+            preprocessingNotes: preprocessed.notes,
+            userNotes: resolvedNotes
         )
         try store.write(inputsData, kind: .inputs, contentHash: inputsHash, inputsHash: inputsHash, producedBy: by)
         try store.write(western, kind: .parsed, contentHash: inputsHash, inputsHash: inputsHash, producedBy: by)
@@ -163,7 +173,8 @@ struct ConvertCommand: AsyncParsableCommand {
         print("\nStep 5: Translating and adapting with AI\(targetContext != nil ? " (targeted)" : "")...")
         let jpResult = try await resolveJPData(
             store: store, repaired: repaired, config: japanConfig, genOptions: genOptions,
-            targetContext: targetContext, inputsHash: inputsHash, rirekishoHash: rHash,
+            targetContext: targetContext, additionalContext: resolvedNotes,
+            inputsHash: inputsHash, rirekishoHash: rHash,
             shokumuHash: sHash, producedBy: by
         )
 
@@ -239,6 +250,7 @@ extension ConvertCommand {
         config: JapanConfig,
         genOptions: GenerationOptions,
         targetContext: TargetCompanyContext?,
+        additionalContext: String?,
         inputsHash: String,
         rirekishoHash: String,
         shokumuHash: String,
@@ -292,7 +304,7 @@ extension ConvertCommand {
                 print("  Generating 履歴書...")
                 let r = try await Stages.generateRirekisho(
                     repaired: repaired, config: config, era: era, targetContext: targetContext,
-                    model: chatModel, verbose: verbose
+                    additionalContext: additionalContext, model: chatModel, verbose: verbose
                 )
                 rirekishoData = r.data
                 rirekishoWarnings = r.asArtifactWarnings
@@ -304,6 +316,7 @@ extension ConvertCommand {
                 let s = try await Stages.generateShokumukeirekisho(
                     repaired: repaired, config: config, era: era, options: genOptions,
                     targetContext: targetContext, namingContext: naming,
+                    additionalContext: additionalContext,
                     model: chatModel, verbose: verbose
                 )
                 shokumuData = s.data

@@ -25,12 +25,17 @@ enum AICache {
 
     // MARK: Content hashing
 
-    /// Compute a stable SHA-256 hex hash from the markdown content, serialized config, and schema version.
-    static func contentHash(markdownContent: String, configData: Data?) -> String {
+    /// Compute a stable SHA-256 hex hash from the markdown content, serialized config,
+    /// optional free-form user notes, and schema version. Existing workspaces without
+    /// notes hash identically (the notes block contributes nothing when nil).
+    static func contentHash(markdownContent: String, configData: Data?, notes: String? = nil) -> String {
         var hasher = SHA256()
         hasher.update(data: Data(markdownContent.utf8))
         if let config = configData {
             hasher.update(data: config)
+        }
+        if let notes, !notes.isEmpty {
+            hasher.update(data: Data(notes.utf8))
         }
         hasher.update(data: Data(schemaVersion.utf8))
         return hasher.finalize().compactMap { String(format: "%02x", $0) }.joined()

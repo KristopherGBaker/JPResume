@@ -18,7 +18,7 @@ enum PromptPayload {
         let sourceKindJSON = try enc.encode(inputs.sourceKind?.rawValue)
         let cleanedTextJSON = try enc.encode(inputs.cleanedText ?? inputs.sourceText)
         let notesJSON = try enc.encode(inputs.preprocessingNotes)
-        return """
+        var body = """
         {
           "western_resume": \(string(westernJSON)),
           "japan_config": \(string(configJSON)),
@@ -27,8 +27,13 @@ enum PromptPayload {
             "cleaned_text": \(string(cleanedTextJSON)),
             "preprocessing_notes": \(string(notesJSON))
           }
-        }
         """
+        if let user = inputs.userNotes, !user.isEmpty {
+            let userJSON = try enc.encode(user)
+            body += ",\n  \"additional_context\": \(string(userJSON))"
+        }
+        body += "\n}"
+        return body
     }
 
     /// Payload for the adapt stages (rirekisho / shokumukeirekisho). Includes
@@ -37,7 +42,8 @@ enum PromptPayload {
     static func adapt(
         normalized: NormalizedResume,
         config: JapanConfig,
-        targetContext: TargetCompanyContext? = nil
+        targetContext: TargetCompanyContext? = nil,
+        additionalContext: String? = nil
     ) throws -> String {
         let enc = JSONCoders.prettySorted
         let normalizedJSON = try enc.encode(normalized)
@@ -52,6 +58,10 @@ enum PromptPayload {
         if let ctx = targetContext {
             let ctxJSON = try enc.encode(ctx)
             msg += ",\n  \"target_company_context\": \(string(ctxJSON))"
+        }
+        if let extra = additionalContext, !extra.isEmpty {
+            let extraJSON = try enc.encode(extra)
+            msg += ",\n  \"additional_context\": \(string(extraJSON))"
         }
         msg += "\n}"
         return msg
