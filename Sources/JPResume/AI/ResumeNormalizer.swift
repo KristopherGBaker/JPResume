@@ -36,6 +36,19 @@ struct ResumeNormalizer: Sendable {
 
     // MARK: - Private
 
+    /// Refine a prior NormalizedResume given the validator's complaints. Single attempt —
+    /// the caller's feedback loop owns the oscillation guard and max-pass cap.
+    func refine(
+        current: NormalizedResume,
+        validation: ValidationResult,
+        inputs: InputsData
+    ) async throws -> NormalizedResume {
+        let system = NormalizeRefinePrompt.system()
+        let user = try NormalizeRefinePrompt.userMessage(current: current, validation: validation,
+                                                          inputs: inputs)
+        return try await decode(system: system, user: user)
+    }
+
     private func decode(system: String, user: String) async throws -> NormalizedResume {
         let messages: [any Message] = [SystemMessage(content: system), HumanMessage(content: user)]
         let result = try await ChatModelDecoder.decode(NormalizedResume.self, model: model, messages: messages)
