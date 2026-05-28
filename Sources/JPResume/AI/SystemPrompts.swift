@@ -1,6 +1,6 @@
 import Foundation
 
-// swiftlint:disable type_body_length
+// swiftlint:disable type_body_length file_length
 enum SystemPrompts {
     // MARK: - Normalization
 
@@ -18,6 +18,23 @@ enum SystemPrompts {
         Treat source_input.cleaned_text as the authoritative fallback whenever the parsed
         western_resume is sparse, incomplete, or clearly missed structure from PDF/plain text.
         Use western_resume when it is helpful, but do not assume it is complete.
+
+        # additional_context (when present)
+
+        The user payload may include an `additional_context` field — free-form text supplied
+        by the candidate directly. Treat it as authoritative supplementary input:
+
+        - Extra work or education entries described here should be merged into experience /
+          education arrays, applying the same date/bullet/category/confidence rules as for the
+          western_resume. Set confidence below 0.8 when dates are vague.
+        - Clarifications about ambiguous content (correct dates, real titles, etc.) override
+          the western_resume but never override japan_config when the two conflict.
+        - Style or emphasis preferences are downstream concerns — note them in
+          normalizer_notes so the adapt stages can apply them; do not let them change factual
+          data here.
+        - Do not invent entries. If the candidate's text says "I worked at X 2015–2017" with
+          no further detail, create the entry with minimal fields; do not fabricate bullets,
+          titles, or locations.
 
         # Core rules
 
@@ -175,6 +192,16 @@ enum SystemPrompts {
           every date to \(eraStyle) format (e.g., \(eraExample)).
         - Honor timeline_warnings: if the timeline is flagged as uncertain, prefer the most
           conservative interpretation.
+
+        # additional_context (when present)
+
+        If the user payload includes an `additional_context` field, treat it as direct
+        guidance from the candidate. Apply:
+        - Facts that the input supports (extra licenses to include, motivation text to use,
+          phrasing preferences for entries) — incorporate them into the output.
+        - Tone or emphasis instructions — apply within the formal-register constraints below.
+        Do NOT use additional_context as a license to invent facts the resume does not
+        support, and never override japan_config when the two conflict.
 
         # Years-of-experience rules (strict)
 
@@ -374,6 +401,15 @@ enum SystemPrompts {
           normalized resume.
         - All dates in \(eraStyle) format.
 
+        # additional_context (when present)
+
+        If the user payload includes an `additional_context` field, treat it as direct
+        guidance from the candidate. Apply factual additions the input supports (extra
+        achievements to include or emphasize, role-by-role guidance, tone preferences) and
+        styling instructions, all within the constraints below. Never use additional_context
+        to invent metrics, companies, or dates the resume does not support, and never
+        override japan_config when the two conflict.
+
         # Years-of-experience rules (strict)
 
         - NEVER use years-of-experience numbers from source prose (e.g. a summary that says
@@ -572,4 +608,4 @@ enum SystemPrompts {
         return lines.joined(separator: "\n")
     }
 }
-// swiftlint:enable type_body_length
+// swiftlint:enable type_body_length file_length
