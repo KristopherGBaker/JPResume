@@ -37,7 +37,8 @@ enum ProviderFactory {
             return OpenAIChatModel(
                 config: OpenAIConfig(apiKey: try requireEnv("OPENAI_API_KEY")),
                 model: resolved,
-                temperature: temperature
+                temperature: temperature,
+                responseFormat: OpenAIResponseFormat.jsonObject()
             )
         case "openrouter":
             return OpenAIChatModel(
@@ -46,7 +47,8 @@ enum ProviderFactory {
                     baseURL: "https://openrouter.ai/api/v1"
                 ),
                 model: resolved,
-                temperature: temperature
+                temperature: temperature,
+                responseFormat: OpenAIResponseFormat.jsonObject()
             )
         case "ollama":
             return OllamaChatModel(
