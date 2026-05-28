@@ -18,15 +18,51 @@ enum Stages {
 
     // MARK: - Normalize
 
+    /// Normalize with an optional validation feedback loop. After the initial pass,
+    /// if validation surfaces issues, hand the validation context back to the LLM and
+    /// re-normalize. Only accept the refined result when its issue count strictly
+    /// decreases (oscillation guard). Capped at `maxRefinements` extra passes.
     static func normalize(
         western: WesternResume,
         inputs: InputsData,
         config: JapanConfig,
         model: any ChatModel,
-        verbose: Bool
+        verbose: Bool,
+        maxRefinements: Int = 2
     ) async throws -> NormalizedResume {
         let normalizer = ResumeNormalizer(model: model, verbose: verbose)
-        return try await normalizer.normalize(western: western, inputs: inputs, config: config)
+        var current = try await normalizer.normalize(western: western, inputs: inputs, config: config)
+        var currentIssues = ResumeValidator.validate(current).issues.count
+
+        guard maxRefinements > 0 else { return current }
+
+        for pass in 1...maxRefinements where currentIssues > 0 {
+            let validation = ResumeValidator.validate(current)
+            if verbose {
+                print("  [Feedback pass \(pass)/\(maxRefinements)] \(currentIssues) validation issue(s); refining...")
+            }
+            do {
+                let refined = try await normalizer.refine(current: current, validation: validation,
+                                                          inputs: inputs)
+                let refinedIssues = ResumeValidator.validate(refined).issues.count
+                if refinedIssues < currentIssues {
+                    if verbose {
+                        print("  [Feedback] \(currentIssues) → \(refinedIssues) issues; accepting")
+                    }
+                    current = refined
+                    currentIssues = refinedIssues
+                } else {
+                    if verbose {
+                        print("  [Feedback] \(currentIssues) → \(refinedIssues) (no improvement); reverting")
+                    }
+                    break
+                }
+            } catch {
+                if verbose { print("  [Feedback] Refinement call failed: \(error); keeping prior pass") }
+                break
+            }
+        }
+        return current
     }
 
     // MARK: - Validate
