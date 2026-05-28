@@ -63,13 +63,15 @@ enum Stages {
         era: EraStyle,
         options: GenerationOptions,
         targetContext: TargetCompanyContext? = nil,
+        namingContext: NamingContext? = nil,
         model: any ChatModel,
         verbose: Bool,
         maxCritiquePasses: Int = 3
     ) async throws -> GenerationResult<ShokumukeirekishoData> {
         let ai = ResumeAI(model: model, verbose: verbose, maxCritiquePasses: maxCritiquePasses)
         return try await ai.generateShokumukeirekisho(normalized: repaired, config: config, era: era,
-                                                       options: options, targetContext: targetContext)
+                                                       options: options, targetContext: targetContext,
+                                                       namingContext: namingContext)
     }
 
     // MARK: - Polish

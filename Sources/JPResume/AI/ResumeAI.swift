@@ -41,11 +41,13 @@ struct ResumeAI: Sendable {
         config: JapanConfig,
         era: EraStyle,
         options: GenerationOptions = GenerationOptions(),
-        targetContext: TargetCompanyContext? = nil
+        targetContext: TargetCompanyContext? = nil,
+        namingContext: NamingContext? = nil
     ) async throws -> GenerationResult<ShokumukeirekishoData> {
         let eraStyle = era == .japanese ? "Japanese era (令和/平成)" : "western year"
         let system = SystemPrompts.shokumukeirekisho(eraStyle: eraStyle, options: options,
-                                                      targetContext: targetContext)
+                                                      targetContext: targetContext,
+                                                      namingContext: namingContext)
         let user = try PromptPayload.adapt(normalized: normalized, config: config, targetContext: targetContext)
 
         let initial: ShokumukeirekishoData = try await invokeStructured(system: system, user: user)
@@ -104,8 +106,8 @@ struct ResumeAI: Sendable {
         violations: [ConstraintViolation],
         stage: String
     ) async throws -> T {
-        let system = SystemPrompts.critique(stage: stage)
-        let user = try SystemPrompts.critiqueUserMessage(current: current, violations: violations)
+        let system = CritiquePrompts.system(stage: stage)
+        let user = try CritiquePrompts.userMessage(current: current, violations: violations)
         return try await invokeStructured(system: system, user: user)
     }
 }
