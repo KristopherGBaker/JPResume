@@ -219,9 +219,12 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
         print("Generating 職務経歴書\(targetContext != nil ? " (targeted)" : "")...")
         let chatModel = try ProviderFactory.create(provider: provider.rawValue, model: model, temperature: 0.3)
         print("  Using AI provider: \(ProviderFactory.label(provider: provider.rawValue, model: model))")
+        let naming = loadRirekishoNamingContext(store: store)
+        if naming != nil { print("  [Naming] Reusing names from existing rirekisho.json") }
         let result = try await Stages.generateShokumukeirekisho(
             repaired: repaired, config: inputsArtifact.data.config, era: era,
-            options: genOptions, targetContext: targetContext, model: chatModel, verbose: verbose
+            options: genOptions, targetContext: targetContext, namingContext: naming,
+            model: chatModel, verbose: verbose
         )
         let polished = Stages.polish(result.data, derived: repaired.derivedExperience)
         try store.write(polished, kind: .shokumukeirekisho, contentHash: contentHash, inputsHash: inputsHash,
@@ -232,6 +235,17 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
 }
 
 // MARK: - Shared helpers
+
+/// If a rirekisho.json exists in the workspace, extract the naming context so the
+/// shokumukeirekisho call uses the same company-name renderings and candidate name.
+/// Returns nil when no rirekisho artifact is present or can't be read.
+func loadRirekishoNamingContext(store: ArtifactStore) -> NamingContext? {
+    guard store.status(.rirekisho) != .missing,
+          let artifact = try? store.read(.rirekisho, as: RirekishoData.self) else {
+        return nil
+    }
+    return NamingContext.from(artifact.data)
+}
 
 func loadTargetContext(_ path: String?) throws -> TargetCompanyContext? {
     guard let path else { return nil }

@@ -2,45 +2,6 @@ import Foundation
 
 // swiftlint:disable type_body_length
 enum SystemPrompts {
-    // MARK: - Critique
-
-    /// System message for the critique pass. The original generation prompt's contract
-    /// still applies — this message extends it with a focused instruction to repair
-    /// specific violations while preserving everything else.
-    static func critique(stage: String) -> String {
-        """
-        You are revising a Japanese resume artifact (\(stage)) that you produced in a prior
-        turn. A deterministic checker found constraint violations that the user message
-        lists explicitly. Your job is to return a corrected JSON object that:
-
-        1. Fixes every listed violation. The rule IDs identify the exact constraint —
-           rewrite the offending content so the rule no longer triggers.
-        2. Preserves every fact, name, date, and metric from the current output that the
-           violations don't ask you to change. Do NOT invent new facts or remove unrelated
-           content.
-        3. Keeps the same JSON schema and field names as the current output.
-        4. Maintains the formal Japanese register from the original system prompt
-           (modest, factual, no hype, no superlatives).
-
-        Return ONLY the corrected JSON. No prose, no code fences, no commentary.
-        """
-    }
-
-    /// Build the user message body for a critique pass. Pairs the current JSON with the
-    /// violation list so the model sees what's wrong and where.
-    static func critiqueUserMessage<T: Encodable>(current: T, violations: [ConstraintViolation]) throws -> String {
-        let enc = JSONCoders.prettySorted
-        let currentJSON = try enc.encode(current)
-        let violationDicts = violations.map { ["rule": $0.rule, "field": $0.field, "message": $0.message] }
-        let violationsJSON = try enc.encode(violationDicts)
-        return """
-        {
-          "current_output": \(String(data: currentJSON, encoding: .utf8)!),
-          "violations": \(String(data: violationsJSON, encoding: .utf8)!)
-        }
-        """
-    }
-
     // MARK: - Normalization
 
     // swiftlint:disable:next function_body_length
@@ -335,9 +296,30 @@ enum SystemPrompts {
 
     // MARK: - 職務経歴書 (Shokumukeirekisho)
 
+    /// Render the naming-consistency block. Empty when no rirekisho exists yet.
+    private static func namingConsistencySection(_ ctx: NamingContext?) -> String {
+        guard let ctx, !(ctx.companyNames.isEmpty && ctx.candidateName == nil) else { return "" }
+        var lines: [String] = [
+            "# Naming consistency with rirekisho (authoritative)",
+            "",
+            "A 履歴書 has already been generated for this candidate. Use the exact same",
+            "names below — same kanji, same particles, same suffixes — so the two",
+            "documents read as one application package."
+        ]
+        if let name = ctx.candidateName {
+            lines.append("- Candidate name: 「\(name)」")
+        }
+        if !ctx.companyNames.isEmpty {
+            lines.append("- Company names (use these renderings verbatim in work_details and prose):")
+            for n in ctx.companyNames { lines.append("  - 「\(n)」") }
+        }
+        return lines.joined(separator: "\n")
+    }
+
     // swiftlint:disable:next function_body_length
     static func shokumukeirekisho(eraStyle: String, options: GenerationOptions,
-                                  targetContext: TargetCompanyContext? = nil) -> String {
+                                  targetContext: TargetCompanyContext? = nil,
+                                  namingContext: NamingContext? = nil) -> String {
         let sideProjectRule: String
         if options.includeSideProjects {
             sideProjectRule = """
@@ -447,6 +429,8 @@ enum SystemPrompts {
         - Otherwise preserve the original official English name.
         - Once chosen, keep the naming consistent across 職務要約, 自己PR, and all
           work_details entries.
+
+        \(namingConsistencySection(namingContext))
 
         # Structure: 職務要約 vs 自己PR (they must be distinct)
 
