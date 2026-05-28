@@ -97,6 +97,9 @@ struct InputsData: Codable, Sendable {
     let sourceText: String?
     let cleanedText: String?
     let preprocessingNotes: [String]
+    /// Free-form additional context supplied by the candidate via `--notes`.
+    /// Read by every LLM stage as `additional_context` in the user payload.
+    let userNotes: String?
 
     enum CodingKeys: String, CodingKey {
         case config
@@ -106,6 +109,7 @@ struct InputsData: Codable, Sendable {
         case sourceText = "source_text"
         case cleanedText = "cleaned_text"
         case preprocessingNotes = "preprocessing_notes"
+        case userNotes = "user_notes"
     }
 
     init(
@@ -115,7 +119,8 @@ struct InputsData: Codable, Sendable {
         sourceKind: ResumeSourceKind? = nil,
         sourceText: String? = nil,
         cleanedText: String? = nil,
-        preprocessingNotes: [String] = []
+        preprocessingNotes: [String] = [],
+        userNotes: String? = nil
     ) {
         self.sourcePath = sourcePath
         self.markdownHash = markdownHash
@@ -124,6 +129,7 @@ struct InputsData: Codable, Sendable {
         self.sourceText = sourceText
         self.cleanedText = cleanedText
         self.preprocessingNotes = preprocessingNotes
+        self.userNotes = userNotes
     }
 
     init(from decoder: Decoder) throws {
@@ -135,15 +141,18 @@ struct InputsData: Codable, Sendable {
         sourceText = try container.decodeIfPresent(String.self, forKey: .sourceText)
         cleanedText = try container.decodeIfPresent(String.self, forKey: .cleanedText)
         preprocessingNotes = try container.decodeIfPresent([String].self, forKey: .preprocessingNotes) ?? []
+        userNotes = try container.decodeIfPresent(String.self, forKey: .userNotes)
     }
 }
 
 // MARK: - ArtifactHashes
 
 enum ArtifactHashes {
-    /// Hash of source markdown + config — same computation as AICache.contentHash.
-    static func inputs(markdownContent: String, configData: Data?) -> String {
-        AICache.contentHash(markdownContent: markdownContent, configData: configData)
+    /// Hash of source markdown + config (+ optional user notes) — same computation
+    /// as AICache.contentHash. Notes fold in so changing `--notes` invalidates
+    /// every downstream artifact, including cached normalize/generate output.
+    static func inputs(markdownContent: String, configData: Data?, notes: String? = nil) -> String {
+        AICache.contentHash(markdownContent: markdownContent, configData: configData, notes: notes)
     }
 
     /// Rirekisho hash includes era style and optional target context.

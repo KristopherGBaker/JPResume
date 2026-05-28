@@ -84,13 +84,15 @@ enum Stages {
         config: JapanConfig,
         era: EraStyle,
         targetContext: TargetCompanyContext? = nil,
+        additionalContext: String? = nil,
         model: any ChatModel,
         verbose: Bool,
         maxCritiquePasses: Int = 3
     ) async throws -> GenerationResult<RirekishoData> {
         let ai = ResumeAI(model: model, verbose: verbose, maxCritiquePasses: maxCritiquePasses)
         return try await ai.generateRirekisho(normalized: repaired, config: config, era: era,
-                                               targetContext: targetContext)
+                                               targetContext: targetContext,
+                                               additionalContext: additionalContext)
     }
 
     static func generateShokumukeirekisho(
@@ -100,6 +102,7 @@ enum Stages {
         options: GenerationOptions,
         targetContext: TargetCompanyContext? = nil,
         namingContext: NamingContext? = nil,
+        additionalContext: String? = nil,
         model: any ChatModel,
         verbose: Bool,
         maxCritiquePasses: Int = 3
@@ -107,7 +110,8 @@ enum Stages {
         let ai = ResumeAI(model: model, verbose: verbose, maxCritiquePasses: maxCritiquePasses)
         return try await ai.generateShokumukeirekisho(normalized: repaired, config: config, era: era,
                                                        options: options, targetContext: targetContext,
-                                                       namingContext: namingContext)
+                                                       namingContext: namingContext,
+                                                       additionalContext: additionalContext)
     }
 
     // MARK: - Polish

@@ -23,13 +23,16 @@ struct ResumeAI: Sendable {
         normalized: NormalizedResume,
         config: JapanConfig,
         era: EraStyle,
-        targetContext: TargetCompanyContext? = nil
+        targetContext: TargetCompanyContext? = nil,
+        additionalContext: String? = nil
     ) async throws -> GenerationResult<RirekishoData> {
         let eraStyle = era == .japanese ? "Japanese era (令和/平成)" : "western year"
         let eraExample = era == .japanese ? "令和2年4月" : "2020年4月"
         let system = SystemPrompts.rirekisho(eraStyle: eraStyle, eraExample: eraExample,
                                               targetContext: targetContext)
-        let user = try PromptPayload.adapt(normalized: normalized, config: config, targetContext: targetContext)
+        let user = try PromptPayload.adapt(normalized: normalized, config: config,
+                                           targetContext: targetContext,
+                                           additionalContext: additionalContext)
 
         let initial: RirekishoData = try await invokeStructured(system: system, user: user)
         return try await refineWithCritique(initial: initial, stage: "rirekisho",
@@ -42,13 +45,16 @@ struct ResumeAI: Sendable {
         era: EraStyle,
         options: GenerationOptions = GenerationOptions(),
         targetContext: TargetCompanyContext? = nil,
-        namingContext: NamingContext? = nil
+        namingContext: NamingContext? = nil,
+        additionalContext: String? = nil
     ) async throws -> GenerationResult<ShokumukeirekishoData> {
         let eraStyle = era == .japanese ? "Japanese era (令和/平成)" : "western year"
         let system = SystemPrompts.shokumukeirekisho(eraStyle: eraStyle, options: options,
                                                       targetContext: targetContext,
                                                       namingContext: namingContext)
-        let user = try PromptPayload.adapt(normalized: normalized, config: config, targetContext: targetContext)
+        let user = try PromptPayload.adapt(normalized: normalized, config: config,
+                                           targetContext: targetContext,
+                                           additionalContext: additionalContext)
 
         let initial: ShokumukeirekishoData = try await invokeStructured(system: system, user: user)
         return try await refineWithCritique(initial: initial, stage: "shokumukeirekisho",
