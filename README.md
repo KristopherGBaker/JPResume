@@ -38,16 +38,30 @@ Then ask your agent: *"Help me create a Japanese resume from my resume.md"*
 jpresume convert resume.md --provider anthropic --format both
 ```
 
+Pass additional context (extra work/education history, style notes) inline or from a file:
+
+```bash
+jpresume convert resume.md --provider anthropic \
+  --notes "Add my 2008-2010 contract role at PrototypeCo. Emphasize startup work."
+
+jpresume convert resume.md --provider anthropic --notes notes/extras.md
+```
+
+The one-shot run includes a self-critique loop (deterministic constraint checks fed back to the LLM for repair) and a validation feedback loop on normalize, so it lands closer to the interactive agent flow than a single-call pipeline would.
+
 ## Features
 
 - Parses markdown, DOCX, and PDF resumes
 - Source-aware ingestion: markdown keeps a deterministic markdown parser, while DOCX/PDF/plain-text input is cleaned and normalized through a text-resume path
 - LLM normalization — structured dates, bullet classification (achievement vs responsibility), skill grouping
 - Validation — date ranges, overlapping roles, `is_current` consistency, total experience
+- Self-critique loop — deterministic Japanese-output constraint checks (forbidden hype phrases, 「現在」 placement, duplicate sentences between 職務要約/自己PR, metric duplication) feed violations back to the LLM for repair, up to 3 passes per generate stage
+- Validation feedback loop on normalize — re-prompts with validator output when fixable, up to 2 refinement passes with oscillation guard
 - Interactive Japan-specific config — kanji name, furigana, education dates, work history, licenses — saved to YAML for reuse
 - Tailored applications — `--target company.json` adjusts 志望動機, 職務要約, 自己PR, and role emphasis for a specific employer
-- Multi-provider AI — Anthropic, OpenAI, OpenRouter, Ollama (via Shikisha)
-- Content-based caching — SHA-256 hash invalidation across all inputs
+- Free-form context — `--notes <path-or-text>` for extra work/education history or style preferences not in the resume or config
+- Multi-provider AI — Anthropic, OpenAI, OpenRouter, Ollama (via [Shikisha](https://github.com/KristopherGBaker/Shikisha))
+- Content-based caching — SHA-256 hash invalidation across all inputs (markdown, config, target, notes)
 - PDF output — 履歴書 as a standard grid form (CoreGraphics + Hiragino Sans); 職務経歴書 as a free-form document
 - Stepwise subcommands — pause, review, and hand-edit between any stage
 
