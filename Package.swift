@@ -10,7 +10,7 @@ let package = Package(
         .package(url: "https://github.com/jpsim/Yams", from: "5.1.0"),
         .package(url: "https://github.com/Techopolis/SwiftDocX", from: "1.0.1"),
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.20"),
-        .package(url: "https://github.com/KristopherGBaker/Shikisha", branch: "main"),
+        .package(url: "https://github.com/KristopherGBaker/Shikisha", from: "0.1.0"),
     ],
     targets: [
         .target(

@@ -1,13 +1,13 @@
 {
-  "originHash" : "85ad90a48cb2deec11b88909e4d245169285f2d144fab758385fb5eaf01c61c7",
+  "originHash" : "5ad6e1aeb7354bed2a56c2cb9b0a453c4594a2d6e9101c5065e1af6beac85f94",
   "pins" : [
     {
       "identity" : "shikisha",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/KristopherGBaker/Shikisha",
       "state" : {
-        "branch" : "main",
-        "revision" : "76ece343039d3b0babfa746179a0919987d70b88"
+        "revision" : "4ea5cab463c4faa706f8af31eb09cd74282f2b79",
+        "version" : "0.1.0"
       }
     },
     {
