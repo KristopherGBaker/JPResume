@@ -1,5 +1,7 @@
 # JPResume
 
+[![CI](https://github.com/KristopherGBaker/JPResume/actions/workflows/ci.yml/badge.svg)](https://github.com/KristopherGBaker/JPResume/actions/workflows/ci.yml)
+
 Convert western-style resumes to Japanese format: 履歴書 (rirekisho) and 職務経歴書 (shokumukeirekisho).
 
 ## Install
