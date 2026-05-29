@@ -23,7 +23,8 @@ packages:
     url: https://github.com/weichsel/ZIPFoundation.git
     from: "0.9.20"
   Shikisha:
-    path: ../Shikisha
+    url: https://github.com/KristopherGBaker/Shikisha
+    branch: main
 
 targets:
   DocPipeline:

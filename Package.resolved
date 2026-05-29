@@ -1,6 +1,15 @@
 {
-  "originHash" : "a4656847e620129354eaaedeaf1dd80f160ea12947dcc1023d30e62d8d14a5a3",
+  "originHash" : "85ad90a48cb2deec11b88909e4d245169285f2d144fab758385fb5eaf01c61c7",
   "pins" : [
+    {
+      "identity" : "shikisha",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/KristopherGBaker/Shikisha",
+      "state" : {
+        "branch" : "main",
+        "revision" : "76ece343039d3b0babfa746179a0919987d70b88"
+      }
+    },
     {
       "identity" : "swift-argument-parser",
       "kind" : "remoteSourceControl",
