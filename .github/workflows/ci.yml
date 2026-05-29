@@ -13,6 +13,7 @@ jobs:
   test:
     name: Build & Test
     runs-on: macos-15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
       - name: Install Swift 6.3
@@ -24,7 +25,10 @@ jobs:
       - name: Build
         run: swift build
       - name: Test
+        # Vision OCR tests hang on headless CI runners (no WindowServer); skip them here.
         run: swift test
+        env:
+          JPRESUME_SKIP_OCR_TESTS: "1"
 
   lint:
     name: SwiftLint
