@@ -5,6 +5,12 @@ import PDFKit
 import Testing
 @testable import jpresume
 
+/// Vision text recognition (`VNRecognizeTextRequest`) hangs indefinitely on headless macOS
+/// CI runners, which have no WindowServer/GUI session. OCR-dependent tests are gated on this
+/// flag and skipped when `JPRESUME_SKIP_OCR_TESTS` is set (CI sets it); they run normally in
+/// local/dev environments where the OCR path is exercised end-to-end.
+private let ocrTestsEnabled = ProcessInfo.processInfo.environment["JPRESUME_SKIP_OCR_TESTS"] == nil
+
 @Suite("Resume Input Reader")
 struct ResumeInputReaderTests {
 
@@ -81,7 +87,7 @@ struct ResumeInputReaderTests {
         #expect(text.contains("Swift and Go"))
     }
 
-    @Test func sparseTextLayerFallsBackToOCR() async throws {
+    @Test(.enabled(if: ocrTestsEnabled)) func sparseTextLayerFallsBackToOCR() async throws {
         // A text-layer PDF below the 100-char threshold triggers Vision OCR fallback.
         let url = try makeTextLayerPDF(content: shortContent)
         defer { try? FileManager.default.removeItem(at: url) }
@@ -91,7 +97,7 @@ struct ResumeInputReaderTests {
 
     // MARK: - Image-only PDF (Vision OCR)
 
-    @Test func readsImageOnlyPDF() async throws {
+    @Test(.enabled(if: ocrTestsEnabled)) func readsImageOnlyPDF() async throws {
         // makeImagePDF strips the text layer — PDFKit returns empty, Vision OCR is required.
         let url = try makeImagePDF(content: richContent)
         defer { try? FileManager.default.removeItem(at: url) }
@@ -129,7 +135,7 @@ struct ResumeInputReaderTests {
         #expect(resume.rawSections["Projects"]?.contains("provider-agnostic LLM orchestration layer") == true)
     }
 
-    @Test func parsesImageOnlyResumePDFIntoStructuredResume() async throws {
+    @Test(.enabled(if: ocrTestsEnabled)) func parsesImageOnlyResumePDFIntoStructuredResume() async throws {
         let url = try makeImagePDF(content: parsedResumeContent)
         defer { try? FileManager.default.removeItem(at: url) }
 
