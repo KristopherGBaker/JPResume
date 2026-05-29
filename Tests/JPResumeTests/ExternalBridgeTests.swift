@@ -1,3 +1,4 @@
+import DocPipeline
 import Testing
 @testable import jpresume
 import Foundation
@@ -18,7 +19,7 @@ struct ExternalBridgeTests {
 
         try ExternalBridge.emitPrompt(
             stage: "normalize",
-            kind: .normalized,
+            kind: ArtifactKind.normalized,
             workspace: ws,
             sourceArtifacts: ["parsed.json", "inputs.json"],
             stageOptions: ["era": "western"],
@@ -52,7 +53,7 @@ struct ExternalBridgeTests {
 
         try ExternalBridge.emitPrompt(
             stage: "shokumukeirekisho",
-            kind: .shokumukeirekisho,
+            kind: ArtifactKind.shokumukeirekisho,
             workspace: ws,
             sourceArtifacts: ["repaired.json", "inputs.json"],
             stageOptions: [

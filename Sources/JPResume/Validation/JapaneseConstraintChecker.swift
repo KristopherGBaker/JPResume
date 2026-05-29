@@ -1,18 +1,13 @@
+import DocPipeline
 import Foundation
 
 /// Deterministic post-generation checker for Japanese resume outputs. Mirrors the hard
 /// constraints listed in `SystemPrompts.rirekisho` / `SystemPrompts.shokumukeirekisho`
 /// so we can detect violations without re-asking the LLM.
 ///
-/// Violations are intentionally surfaced as a list rather than auto-fixed: rewriting
-/// formal Japanese requires the LLM. The self-critique loop feeds these back as the
-/// targeted instructions for the next pass.
-struct ConstraintViolation: Sendable, Equatable {
-    let rule: String          // stable ID — keeps tests + critique prompts in sync
-    let field: String         // the artifact field the violation lives in
-    let message: String       // human-readable description, also fed to the LLM
-}
-
+/// Violations (`DocPipeline.ConstraintViolation`) are intentionally surfaced as a list
+/// rather than auto-fixed: rewriting formal Japanese requires the LLM. The self-critique
+/// loop feeds these back as the targeted instructions for the next pass.
 enum JapaneseConstraintChecker {
 
     // MARK: - Rirekisho

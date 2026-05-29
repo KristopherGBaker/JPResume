@@ -1,3 +1,4 @@
+import DocPipeline
 import ArgumentParser
 import Foundation
 
@@ -83,7 +84,7 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
                                                targetContext: targetContext)
             var opts = ["era": era.rawValue]
             if let t = target { opts["target"] = t }
-            try ExternalBridge.emitPrompt(stage: "rirekisho", kind: .rirekisho, workspace: workspaceURL,
+            try ExternalBridge.emitPrompt(stage: "rirekisho", kind: ArtifactKind.rirekisho, workspace: workspaceURL,
                                           sourceArtifacts: ["repaired.json", "inputs.json"],
                                           stageOptions: opts, system: system, user: user, temperature: 0.3)
             return
@@ -93,7 +94,8 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
             try ExternalBridge.ingestResponse(
                 stage: "rirekisho", kind: .rirekisho,
                 workspace: workspaceURL, store: store,
-                contentHash: contentHash, inputsHash: inputsHash, model: model,
+                contentHash: contentHash, inputsHash: inputsHash,
+                producedBy: ProducedBy.external(model: model ?? "external"),
                 as: RirekishoData.self
             ) { Stages.polish($0, derived: repaired.derivedExperience) }
             return
@@ -198,7 +200,7 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
                 "include_older_irrelevant_roles": String(!excludeOlderRoles)
             ]
             if let t = target { opts["target"] = t }
-            try ExternalBridge.emitPrompt(stage: "shokumukeirekisho", kind: .shokumukeirekisho,
+            try ExternalBridge.emitPrompt(stage: "shokumukeirekisho", kind: ArtifactKind.shokumukeirekisho,
                                           workspace: workspaceURL,
                                           sourceArtifacts: ["repaired.json", "inputs.json"],
                                           stageOptions: opts, system: system, user: user, temperature: 0.3)
@@ -209,7 +211,8 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
             try ExternalBridge.ingestResponse(
                 stage: "shokumukeirekisho", kind: .shokumukeirekisho,
                 workspace: workspaceURL, store: store,
-                contentHash: contentHash, inputsHash: inputsHash, model: model,
+                contentHash: contentHash, inputsHash: inputsHash,
+                producedBy: ProducedBy.external(model: model ?? "external"),
                 as: ShokumukeirekishoData.self
             ) { Stages.polish($0, derived: repaired.derivedExperience) }
             return

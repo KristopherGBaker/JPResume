@@ -1,3 +1,4 @@
+import DocPipeline
 import Foundation
 
 /// Prompts for the normalize stage's validation feedback loop. Mirrors the structure of

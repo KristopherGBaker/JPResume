@@ -1,3 +1,4 @@
+import DocPipeline
 import Foundation
 
 /// Prompts used by the self-critique loop. Lives separately from `SystemPrompts` because

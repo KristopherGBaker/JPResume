@@ -1,17 +1,15 @@
 import CryptoKit
+import DocPipeline
 import Foundation
 
-// MARK: - ArtifactWarning
-
-struct ArtifactWarning: Codable, Sendable {
-    let severity: Severity
-    let field: String?
-    let message: String
-}
+/// The resume pipeline's artifact store, specialized to `ArtifactKind`. Keeping the name
+/// `ArtifactStore` lets every call site read unchanged; the generic mechanism lives in
+/// DocPipeline.
+typealias ArtifactStore = DocPipeline.ArtifactStore<ArtifactKind>
 
 // MARK: - ArtifactKind
 
-enum ArtifactKind: String, CaseIterable, Sendable {
+enum ArtifactKind: String, CaseIterable, Sendable, ArtifactKey {
     case inputs
     case parsed
     case normalized
@@ -29,42 +27,16 @@ enum ArtifactKind: String, CaseIterable, Sendable {
         default: return "source"
         }
     }
-}
 
-// MARK: - Artifact<T>
-
-struct Artifact<T: Codable>: Codable {
-    let kind: String
-    let role: String          // "source" | "derived"
-    let schemaVersion: String
-    let contentHash: String
-    let inputsHash: String
-    let producedAt: String    // ISO-8601
-    let producedBy: String
-    let mode: String          // "internal" | "external"
-    let warnings: [ArtifactWarning]
-    let data: T
-
-    enum CodingKeys: String, CodingKey {
-        case kind, role, data, warnings, mode
-        case schemaVersion = "schema_version"
-        case contentHash = "content_hash"
-        case inputsHash = "inputs_hash"
-        case producedAt = "produced_at"
-        case producedBy = "produced_by"
+    // Legacy single-file cache names (one upgrade window). Read by DocPipeline's store.
+    var legacyCacheFilename: String? {
+        switch self {
+        case .normalized:        return ".normalized_cache.json"
+        case .rirekisho:         return ".rirekisho_cache.json"
+        case .shokumukeirekisho: return ".shokumukeirekisho_cache.json"
+        default:                 return nil
+        }
     }
-}
-
-// MARK: - ArtifactSummary
-
-struct ArtifactSummary: Sendable {
-    let kind: ArtifactKind
-    let status: ArtifactStatus
-    let producedAt: String?
-    let producedBy: String?
-    let warningCount: Int
-    let errorCount: Int
-    let infoCount: Int
 }
 
 // MARK: - InputsData
@@ -148,9 +120,9 @@ struct InputsData: Codable, Sendable {
 // MARK: - ArtifactHashes
 
 enum ArtifactHashes {
-    /// Hash of source markdown + config (+ optional user notes) — same computation
-    /// as AICache.contentHash. Notes fold in so changing `--notes` invalidates
-    /// every downstream artifact, including cached normalize/generate output.
+    /// Hash of source markdown + config (+ optional user notes) — same computation as
+    /// `AICache.contentHash`. Notes fold in so changing `--notes` invalidates every
+    /// downstream artifact, including cached normalize/generate output.
     static func inputs(markdownContent: String, configData: Data?, notes: String? = nil) -> String {
         AICache.contentHash(markdownContent: markdownContent, configData: configData, notes: notes)
     }
@@ -184,7 +156,7 @@ enum ArtifactHashes {
 // MARK: - ProducedBy
 
 /// Produces the `produced_by` string using the grammar `<actor>/<version> [<slug>:<model>]`.
-/// Provider slug is the `ProviderChoice` raw value (e.g. "anthropic", "ollama").
+/// Provider slug is the provider raw value (e.g. "anthropic", "ollama").
 enum ProducedBy {
     static let actor = "jpresume"
     static let version = "0.5.0"

@@ -1,3 +1,4 @@
+import DocPipeline
 import ArgumentParser
 import Foundation
 
@@ -48,7 +49,7 @@ struct NormalizeCommand: AsyncParsableCommand {
             let system = SystemPrompts.normalization()
             let user = try PromptPayload.normalize(western: parsedArtifact.data, inputs: inputsArtifact.data,
                                                    config: inputsArtifact.data.config)
-            try ExternalBridge.emitPrompt(stage: "normalize", kind: .normalized, workspace: workspaceURL,
+            try ExternalBridge.emitPrompt(stage: "normalize", kind: ArtifactKind.normalized, workspace: workspaceURL,
                                           sourceArtifacts: ["parsed.json", "inputs.json"],
                                           system: system, user: user, temperature: 0.2)
             return
@@ -58,7 +59,8 @@ struct NormalizeCommand: AsyncParsableCommand {
             try ExternalBridge.ingestResponse(
                 stage: "normalize", kind: .normalized,
                 workspace: workspaceURL, store: store,
-                contentHash: inputsHash, inputsHash: inputsHash, model: model,
+                contentHash: inputsHash, inputsHash: inputsHash,
+                producedBy: ProducedBy.external(model: model ?? "external"),
                 as: NormalizedResume.self
             )
             return
