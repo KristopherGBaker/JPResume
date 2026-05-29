@@ -16,17 +16,40 @@ packages:
   Yams:
     url: https://github.com/jpsim/Yams
     from: "5.1.0"
+  SwiftDocX:
+    url: https://github.com/Techopolis/SwiftDocX
+    from: "1.0.1"
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation.git
+    from: "0.9.20"
+  Shikisha:
+    path: ../Shikisha
 
 targets:
+  DocPipeline:
+    type: library.static
+    platform: macOS
+    sources:
+      - path: Sources/DocPipeline
+    dependencies:
+      - package: Shikisha
+    settings:
+      base:
+        SWIFT_VERSION: "6.2"
+
   jpresume:
     type: tool
     platform: macOS
     sources:
       - path: Sources/JPResume
     dependencies:
+      - target: DocPipeline
       - package: swift-argument-parser
         product: ArgumentParser
       - package: Yams
+      - package: SwiftDocX
+      - package: ZIPFoundation
+      - package: Shikisha
       - framework: AppKit
         implicit: true
       - framework: PDFKit
@@ -45,6 +68,7 @@ targets:
       - path: Tests/JPResumeTests
     dependencies:
       - target: jpresume
+      - target: DocPipeline
     settings:
       base:
         SWIFT_VERSION: "6.2"
