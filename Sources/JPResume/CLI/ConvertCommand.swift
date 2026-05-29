@@ -1,3 +1,4 @@
+import DocPipeline
 import ArgumentParser
 import Foundation
 

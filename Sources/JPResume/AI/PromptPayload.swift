@@ -1,3 +1,4 @@
+import DocPipeline
 import Foundation
 
 /// User-message payloads shared between internal AI calls and external prompt

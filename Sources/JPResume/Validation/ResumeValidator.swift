@@ -1,3 +1,4 @@
+import DocPipeline
 import Foundation
 
 // MARK: - Validation types
