@@ -3,19 +3,19 @@ import Foundation
 // MARK: - PromptBundle
 
 /// JSON bundle written to <workspace>/<stage>.prompt.json in --external mode.
-struct PromptBundle: Codable {
-    let stage: String
-    let artifactKind: String
-    let workspace: String
-    let sourceArtifacts: [String]
-    let stageOptions: [String: String]
-    let system: String
-    let user: String
-    let temperature: Double
-    let expectedOutputFormat: String
+public struct PromptBundle: Codable {
+    public let stage: String
+    public let artifactKind: String
+    public let workspace: String
+    public let sourceArtifacts: [String]
+    public let stageOptions: [String: String]
+    public let system: String
+    public let user: String
+    public let temperature: Double
+    public let expectedOutputFormat: String
     /// Empty for MVP — prose-only schema lives in `system`. Reserved for future JSON Schema emission.
-    let responseSchema: [String: String]
-    let responsePath: String
+    public let responseSchema: [String: String]
+    public let responsePath: String
 
     enum CodingKeys: String, CodingKey {
         case stage, workspace, system, user, temperature
@@ -30,13 +30,16 @@ struct PromptBundle: Codable {
 
 // MARK: - ExternalBridge
 
-enum ExternalBridge {
+/// Emits prompt bundles for an external agent and ingests their responses. Generic over a
+/// pipeline's `ArtifactKey`; provenance for ingested artifacts is supplied by the caller
+/// via `producedBy` so this layer stays free of any app-specific naming.
+public enum ExternalBridge {
 
     /// Write a prompt bundle for an external agent to fulfil.
     /// Exits after writing; caller should return/exit with success.
-    static func emitPrompt(
+    public static func emitPrompt<Key: ArtifactKey>(
         stage: String,
-        kind: ArtifactKind,
+        kind: Key,
         workspace: URL,
         sourceArtifacts: [String],
         stageOptions: [String: String] = [:],
@@ -72,7 +75,7 @@ enum ExternalBridge {
     /// Read the agent's response from <workspace>/<stage>.response.json.
     /// Returns the raw string content (the AI's reply).
     /// On failure writes <workspace>/<stage>.error.json and throws.
-    static func readResponse(stage: String, workspace: URL) throws -> String {
+    public static func readResponse(stage: String, workspace: URL) throws -> String {
         let responseURL = workspace.appendingPathComponent("\(stage).response.json")
         guard FileManager.default.fileExists(atPath: responseURL.path) else {
             throw ExternalBridgeError.responseMissing(responseURL.path)
@@ -90,25 +93,25 @@ enum ExternalBridge {
     }
 
     /// Write a structured error file when --ingest fails.
-    static func writeError(_ error: ErrorBundle, stage: String, workspace: URL) throws {
+    public static func writeError(_ error: ErrorBundle, stage: String, workspace: URL) throws {
         let data = try JSONCoders.prettySorted.encode(error)
         let url = workspace.appendingPathComponent("\(stage).error.json")
         try data.write(to: url)
         print("  Error written to \(url.path)")
     }
 
-    /// Read an external agent's response, decode it, optionally transform it,
-    /// and write the resulting artifact. Wraps the read → extract → decode →
-    /// (transform) → write pipeline shared by every `--ingest` flow, including
-    /// the `ErrorBundle` cleanup that fires when any step throws.
-    static func ingestResponse<T: Codable>(
+    /// Read an external agent's response, decode it, optionally transform it, and write the
+    /// resulting artifact. Wraps the read → extract → decode → (transform) → write pipeline
+    /// shared by every `--ingest` flow, including the `ErrorBundle` cleanup that fires when
+    /// any step throws. `producedBy` is supplied by the caller (e.g. "claude-code/external <model>").
+    public static func ingestResponse<T: Codable, Key: ArtifactKey>(
         stage: String,
-        kind: ArtifactKind,
+        kind: Key,
         workspace: URL,
-        store: ArtifactStore,
+        store: ArtifactStore<Key>,
         contentHash: String,
         inputsHash: String,
-        model: String?,
+        producedBy: String,
         as _: T.Type = T.self,
         transform: (T) -> T = { $0 }
     ) throws {
@@ -117,9 +120,8 @@ enum ExternalBridge {
             let jsonData = try extractJSON(from: raw)
             let decoded = try JSONDecoder().decode(T.self, from: jsonData)
             let final = transform(decoded)
-            let by = ProducedBy.external(model: model ?? "external")
             try store.write(final, kind: kind, contentHash: contentHash, inputsHash: inputsHash,
-                            producedBy: by, mode: "external")
+                            producedBy: producedBy, mode: "external")
             print("  ✓ Ingested \(kind.filename)")
         } catch {
             let bundle = ErrorBundle(
@@ -134,13 +136,13 @@ enum ExternalBridge {
 
 // MARK: - ErrorBundle
 
-struct ErrorBundle: Codable {
-    let stage: String
-    let error: String
-    let responsePath: String
-    let timestamp: String
+public struct ErrorBundle: Codable {
+    public let stage: String
+    public let error: String
+    public let responsePath: String
+    public let timestamp: String
 
-    init(stage: String, error: String, responsePath: String) {
+    public init(stage: String, error: String, responsePath: String) {
         self.stage = stage
         self.error = error
         self.responsePath = responsePath
@@ -155,11 +157,11 @@ struct ErrorBundle: Codable {
 
 // MARK: - ExternalBridgeError
 
-enum ExternalBridgeError: Error, CustomStringConvertible {
+public enum ExternalBridgeError: Error, CustomStringConvertible {
     case responseMissing(String)
     case parseError(String)
 
-    var description: String {
+    public var description: String {
         switch self {
         case .responseMissing(let path):
             return "Response file not found: \(path). Write the AI output there and re-run with --ingest."
@@ -173,8 +175,7 @@ enum ExternalBridgeError: Error, CustomStringConvertible {
 
 /// Extract the first valid JSON object from an external agent's response. Tolerates a
 /// markdown code fence around the object and a brace-matched object embedded in prose.
-/// External agents (humans, other LLMs) routinely emit either shape; the LLM path
-/// hits Shikisha's `asStructuredOutput` which already strips fences.
+/// External agents (humans, other LLMs) routinely emit either shape.
 private func extractJSON(from text: String) throws -> Data {
     let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
 

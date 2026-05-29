@@ -1,11 +1,14 @@
 import Foundation
 import Shikisha
 
-/// Builds Shikisha `ChatModel` instances for the providers JPResume supports.
-/// One model per stage — temperature is set at construction because Shikisha models
-/// don't take per-call temperature, and each pipeline stage uses its own value.
-enum ProviderFactory {
-    static let defaultModels: [String: String] = [
+/// Builds Shikisha `ChatModel` instances for the providers a document pipeline supports.
+/// One model per stage — temperature is set at construction because Shikisha models don't
+/// take per-call temperature, and each pipeline stage uses its own value.
+///
+/// `defaultModels` ships sensible defaults and is `public` so a consuming pipeline can
+/// read them (e.g. to label runs).
+public enum ProviderFactory {
+    public static let defaultModels: [String: String] = [
         "anthropic": "claude-sonnet-4-6",
         "openai": "gpt-5.4",
         "openrouter": "gemma4",
@@ -13,11 +16,11 @@ enum ProviderFactory {
     ]
 
     /// Resolve a model name for a provider, falling back to the default if none is supplied.
-    static func resolveModel(provider: String, model: String?) -> String {
+    public static func resolveModel(provider: String, model: String?) -> String {
         model ?? defaultModels[provider] ?? ""
     }
 
-    static func create(
+    public static func create(
         provider: String,
         model: String? = nil,
         temperature: Double? = nil
@@ -61,8 +64,8 @@ enum ProviderFactory {
         }
     }
 
-    /// Human-readable label used by CLI logs. Mirrors the old `AIProvider.name`.
-    static func label(provider: String, model: String?) -> String {
+    /// Human-readable label used by CLI logs.
+    public static func label(provider: String, model: String?) -> String {
         let resolved = resolveModel(provider: provider, model: model)
         let prettyProvider: String = {
             switch provider {
@@ -84,11 +87,11 @@ enum ProviderFactory {
     }
 }
 
-enum ProviderFactoryError: Error, LocalizedError {
+public enum ProviderFactoryError: Error, LocalizedError {
     case missingAPIKey(String)
     case unknownProvider(String)
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .missingAPIKey(let key):
             return "\(key) environment variable is required"

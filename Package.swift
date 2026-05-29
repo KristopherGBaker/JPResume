@@ -13,9 +13,17 @@ let package = Package(
         .package(path: "../Shikisha"),
     ],
     targets: [
+        .target(
+            name: "DocPipeline",
+            dependencies: [
+                .product(name: "Shikisha", package: "Shikisha"),
+            ],
+            path: "Sources/DocPipeline"
+        ),
         .executableTarget(
             name: "jpresume",
             dependencies: [
+                "DocPipeline",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "Shikisha", package: "Shikisha"),
                 .product(name: "SwiftDocX", package: "SwiftDocX"),
