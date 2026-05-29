@@ -1,12 +1,12 @@
 import Foundation
 import Shikisha
 
-/// Bridge that lets us call `asStructuredOutput` against an `any ChatModel` existential.
-/// Swift can't open the existential when the result type embeds Self (as
+/// Bridge that lets callers run `asStructuredOutput` against an `any ChatModel` existential.
+/// Swift can't open the existential when the result type embeds `Self` (as
 /// `StructuredOutputRunnable<Self, T>` does), so we route through this generic helper —
-/// `model` is taken by value, M is opened, and only T appears in the return.
-enum ChatModelDecoder {
-    static func decode<T: Decodable & Sendable>(
+/// `model` is taken by value, `M` is opened, and only `T` appears in the return type.
+public enum ChatModelDecoder {
+    public static func decode<T: Decodable & Sendable>(
         _ type: T.Type,
         model: any ChatModel,
         messages: [any Message],

@@ -3,11 +3,13 @@ import Foundation
 
 // MARK: - CacheEnvelope
 
-struct CacheEnvelope<T: Codable>: Codable {
-    let contentHash: String
-    let schemaVersion: String
-    let cachedAt: String
-    let data: T
+/// Legacy single-file cache envelope. Superseded by `Artifact<T>` but retained so the
+/// store can read pre-workspace cache files for one upgrade cycle.
+public struct CacheEnvelope<T: Codable>: Codable {
+    public let contentHash: String
+    public let schemaVersion: String
+    public let cachedAt: String
+    public let data: T
 
     enum CodingKeys: String, CodingKey {
         case data
@@ -19,16 +21,19 @@ struct CacheEnvelope<T: Codable>: Codable {
 
 // MARK: - AICache
 
-enum AICache {
+/// Content hashing plus the legacy single-file cache reader/writer. The hashing inputs
+/// are deliberately generic (a primary string, optional secondary data, optional extra
+/// string) so any document pipeline can fold its own inputs into a stable cache key.
+public enum AICache {
     /// Bump this when any cached model type changes shape.
-    static let schemaVersion = "2.0.0"
+    public static let schemaVersion = "2.0.0"
 
     // MARK: Content hashing
 
-    /// Compute a stable SHA-256 hex hash from the markdown content, serialized config,
-    /// optional free-form user notes, and schema version. Existing workspaces without
-    /// notes hash identically (the notes block contributes nothing when nil).
-    static func contentHash(markdownContent: String, configData: Data?, notes: String? = nil) -> String {
+    /// Compute a stable SHA-256 hex hash from the markdown/source content, serialized
+    /// config, optional free-form notes, and schema version. Existing workspaces without
+    /// notes hash identically (the notes block contributes nothing when nil/empty).
+    public static func contentHash(markdownContent: String, configData: Data?, notes: String? = nil) -> String {
         var hasher = SHA256()
         hasher.update(data: Data(markdownContent.utf8))
         if let config = configData {
@@ -44,7 +49,7 @@ enum AICache {
     // MARK: Load
 
     /// Load a cached value if the file exists and the content hash matches.
-    static func load<T: Codable>(from url: URL, expectedHash: String) -> T? {
+    public static func load<T: Codable>(from url: URL, expectedHash: String) -> T? {
         guard FileManager.default.fileExists(atPath: url.path),
               let data = try? Data(contentsOf: url) else { return nil }
         guard let envelope = try? JSONDecoder().decode(CacheEnvelope<T>.self, from: data) else {
@@ -56,7 +61,7 @@ enum AICache {
 
     // MARK: Save
 
-    static func save<T: Codable>(_ value: T, to url: URL, contentHash: String) throws {
+    public static func save<T: Codable>(_ value: T, to url: URL, contentHash: String) throws {
         let envelope = CacheEnvelope(
             contentHash: contentHash,
             schemaVersion: schemaVersion,
