@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - ArtifactStatus
 
-enum ArtifactStatus: Equatable, Sendable {
+public enum ArtifactStatus: Equatable, Sendable {
     case fresh
     case stale(reason: String)   // exists, parses, but hash doesn't match
     case missing                 // file doesn't exist
@@ -33,15 +33,23 @@ private struct ArtifactMetadata: Codable {
 
 // MARK: - ArtifactStore
 
-struct ArtifactStore: Sendable {
-    static let schemaVersion = "3.0.0"
-    let root: URL
+/// Typed read/write over a workspace directory, generic over a document pipeline's
+/// `ArtifactKey`. Writes are atomic; status is a four-state machine
+/// (`fresh` / `stale` / `missing` / `invalid`). Carries no knowledge of any specific
+/// document type — the `Key` supplies filenames, roles, and legacy cache names.
+public struct ArtifactStore<Key: ArtifactKey>: Sendable {
+    public static var schemaVersion: String { "3.0.0" }
+    public let root: URL
+
+    public init(root: URL) {
+        self.root = root
+    }
 
     // MARK: Write
 
-    func write<T: Codable>(
+    public func write<T: Codable>(
         _ value: T,
-        kind: ArtifactKind,
+        kind: Key,
         contentHash: String,
         inputsHash: String,
         producedBy: String,
@@ -75,10 +83,10 @@ struct ArtifactStore: Sendable {
 
     // MARK: Read
 
-    func read<T: Codable>(_ kind: ArtifactKind, as _: T.Type = T.self) throws -> Artifact<T> {
+    public func read<T: Codable>(_ kind: Key, as _: T.Type = T.self) throws -> Artifact<T> {
         let url = root.appendingPathComponent(kind.filename)
         guard FileManager.default.fileExists(atPath: url.path) else {
-            throw ArtifactStoreError.missing(kind)
+            throw ArtifactStoreError.missing(kind.filename)
         }
         let data = try Data(contentsOf: url)
         return try JSONDecoder().decode(Artifact<T>.self, from: data)
@@ -89,7 +97,7 @@ struct ArtifactStore: Sendable {
     /// Decode the metadata-only header from an artifact file, if present and parseable.
     /// Errors (missing file, bad JSON) collapse to `nil` — callers handle that as
     /// "treat as missing/invalid" via `status(_:)`.
-    private func loadMetadata(_ kind: ArtifactKind) -> ArtifactMetadata? {
+    private func loadMetadata(_ kind: Key) -> ArtifactMetadata? {
         let url = root.appendingPathComponent(kind.filename)
         guard let data = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder().decode(ArtifactMetadata.self, from: data)
@@ -97,7 +105,7 @@ struct ArtifactStore: Sendable {
 
     // MARK: Status
 
-    func status(_ kind: ArtifactKind, expectedContentHash: String? = nil) -> ArtifactStatus {
+    public func status(_ kind: Key, expectedContentHash: String? = nil) -> ArtifactStatus {
         let url = root.appendingPathComponent(kind.filename)
         if !FileManager.default.fileExists(atPath: url.path) {
             if let legacy = legacyURL(for: kind),
@@ -121,18 +129,32 @@ struct ArtifactStore: Sendable {
 
     // MARK: Produced-by for cache-hit log
 
-    func producedBy(_ kind: ArtifactKind) -> String? {
+    public func producedBy(_ kind: Key) -> String? {
         loadMetadata(kind)?.producedBy
     }
 
-    func producedAt(_ kind: ArtifactKind) -> Date? {
+    public func producedAt(_ kind: Key) -> Date? {
         loadMetadata(kind).flatMap { ISO8601DateFormatter().date(from: $0.producedAt) }
     }
 
-    // MARK: List
+    // MARK: Legacy cache fallback
 
-    func list(expectedContentHash: String? = nil) -> [ArtifactSummary] {
-        ArtifactKind.allCases.map { kind in
+    public func loadLegacy<T: Codable>(_ kind: Key, as _: T.Type = T.self, expectedHash: String) -> T? {
+        guard let url = legacyURL(for: kind) else { return nil }
+        return AICache.load(from: url, expectedHash: expectedHash)
+    }
+
+    private func legacyURL(for kind: Key) -> URL? {
+        guard let name = kind.legacyCacheFilename else { return nil }
+        return root.deletingLastPathComponent().appendingPathComponent(name)
+    }
+}
+
+// MARK: - List (requires enumerable keys)
+
+public extension ArtifactStore where Key: CaseIterable {
+    func list(expectedContentHash: String? = nil) -> [ArtifactSummary<Key>] {
+        Key.allCases.map { kind in
             let s = status(kind, expectedContentHash: expectedContentHash)
             var producedAt: String?
             var producedBy: String?
@@ -155,37 +177,20 @@ struct ArtifactStore: Sendable {
                                    errorCount: errCount, infoCount: infoCount)
         }
     }
-
-    // MARK: Legacy cache fallback
-
-    func loadLegacy<T: Codable>(_ kind: ArtifactKind, as _: T.Type = T.self, expectedHash: String) -> T? {
-        guard let url = legacyURL(for: kind) else { return nil }
-        return AICache.load(from: url, expectedHash: expectedHash)
-    }
-
-    private func legacyURL(for kind: ArtifactKind) -> URL? {
-        let parent = root.deletingLastPathComponent()
-        switch kind {
-        case .normalized:     return parent.appendingPathComponent(".normalized_cache.json")
-        case .rirekisho:      return parent.appendingPathComponent(".rirekisho_cache.json")
-        case .shokumukeirekisho: return parent.appendingPathComponent(".shokumukeirekisho_cache.json")
-        default: return nil
-        }
-    }
 }
 
 // MARK: - ArtifactStoreError
 
-enum ArtifactStoreError: Error, CustomStringConvertible {
-    case missing(ArtifactKind)
-    case invalid(ArtifactKind, String)
+public enum ArtifactStoreError: Error, CustomStringConvertible {
+    case missing(String)        // filename
+    case invalid(String, String) // filename, reason
 
-    var description: String {
+    public var description: String {
         switch self {
-        case .missing(let kind):
-            return "Artifact '\(kind.filename)' not found in workspace. Run the appropriate stage first."
-        case .invalid(let kind, let reason):
-            return "Artifact '\(kind.filename)' is invalid: \(reason)"
+        case .missing(let name):
+            return "Artifact '\(name)' not found in workspace. Run the appropriate stage first."
+        case .invalid(let name, let reason):
+            return "Artifact '\(name)' is invalid: \(reason)"
         }
     }
 }
