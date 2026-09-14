@@ -49,6 +49,13 @@ jpresume convert resume.md --provider anthropic \
 jpresume convert resume.md --provider anthropic --notes notes/extras.md
 ```
 
+Stepwise runs take the same flag on `parse`; the notes are stored in `inputs.json` and every
+later stage picks them up:
+
+```bash
+jpresume parse resume.pdf --workspace .jpresume --notes notes/extras.md
+```
+
 The one-shot run includes a self-critique loop (deterministic constraint checks fed back to the LLM for repair) and a validation feedback loop on normalize, so it lands closer to the interactive agent flow than a single-call pipeline would.
 
 ## Features

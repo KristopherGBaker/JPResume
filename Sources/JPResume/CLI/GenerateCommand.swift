@@ -81,7 +81,8 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
             let system = SystemPrompts.rirekisho(eraStyle: eraStyle, eraExample: eraExample,
                                                   targetContext: targetContext)
             let user = try PromptPayload.adapt(normalized: repaired, config: inputsArtifact.data.config,
-                                               targetContext: targetContext)
+                                               targetContext: targetContext,
+                                               additionalContext: inputsArtifact.data.userNotes)
             var opts = ["era": era.rawValue]
             if let t = target { opts["target"] = t }
             try ExternalBridge.emitPrompt(stage: "rirekisho", kind: ArtifactKind.rirekisho, workspace: workspaceURL,
@@ -107,7 +108,8 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
         print("  Using AI provider: \(ProviderFactory.label(provider: provider.rawValue, model: model))")
         let result = try await Stages.generateRirekisho(
             repaired: repaired, config: inputsArtifact.data.config, era: era,
-            targetContext: targetContext, model: chatModel, verbose: verbose
+            targetContext: targetContext, additionalContext: inputsArtifact.data.userNotes,
+            model: chatModel, verbose: verbose
         )
         let polished = Stages.polish(result.data, derived: repaired.derivedExperience)
         try store.write(polished, kind: .rirekisho, contentHash: contentHash, inputsHash: inputsHash,
@@ -193,7 +195,8 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
             let system = SystemPrompts.shokumukeirekisho(eraStyle: eraStyle, options: genOptions,
                                                           targetContext: targetContext)
             let user = try PromptPayload.adapt(normalized: repaired, config: inputsArtifact.data.config,
-                                               targetContext: targetContext)
+                                               targetContext: targetContext,
+                                               additionalContext: inputsArtifact.data.userNotes)
             var opts = [
                 "era": era.rawValue,
                 "include_side_projects": String(includeSideProjects),
@@ -227,7 +230,7 @@ struct GenerateShokumukeirekishoCommand: AsyncParsableCommand {
         let result = try await Stages.generateShokumukeirekisho(
             repaired: repaired, config: inputsArtifact.data.config, era: era,
             options: genOptions, targetContext: targetContext, namingContext: naming,
-            model: chatModel, verbose: verbose
+            additionalContext: inputsArtifact.data.userNotes, model: chatModel, verbose: verbose
         )
         let polished = Stages.polish(result.data, derived: repaired.derivedExperience)
         try store.write(polished, kind: .shokumukeirekisho, contentHash: contentHash, inputsHash: inputsHash,

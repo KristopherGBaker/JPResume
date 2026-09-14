@@ -1,6 +1,7 @@
 import DocPipeline
 import Testing
 @testable import jpresume
+import ArgumentParser
 import Foundation
 import Shikisha
 
@@ -128,6 +129,75 @@ struct UserNotesTests {
         let userMessage = calls.first?.last?.content ?? ""
         #expect(userMessage.contains("additional_context"))
         #expect(userMessage.contains("株式会社"))
+    }
+
+    // MARK: - Stepwise plumbing (parse --notes → inputs.json → generate)
+
+    /// `parse --notes` must persist the notes and fold them into the inputs hash, so a
+    /// stepwise run gets the same additional_context that `convert --notes` does.
+    @Test func parseStoresNotesInInputsAndFoldsThemIntoTheHash() async throws {
+        let project = FileManager.default.temporaryDirectory
+            .appendingPathComponent("jpresume-notes-parse-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: project) }
+
+        let resume = project.appendingPathComponent("resume.md")
+        try "# Jane Doe\n\n## Experience\n\n### Engineer at Corp\nJan 2020 - Dec 2023\n\n- Built stuff"
+            .write(to: resume, atomically: true, encoding: .utf8)
+        let config = project.appendingPathComponent("jpresume_config.yaml")
+        try "name_kanji: 山田 太郎\n".write(to: config, atomically: true, encoding: .utf8)
+
+        let bare = project.appendingPathComponent(".jpresume-bare", isDirectory: true)
+        let bareParse = try ParseCommand.parse([resume.path, "--workspace", bare.path,
+                                                "--config", config.path])
+        try await bareParse.run()
+        let bareInputs = try ArtifactStore(root: bare).read(.inputs, as: InputsData.self)
+
+        let noted = project.appendingPathComponent(".jpresume-noted", isDirectory: true)
+        let notedParse = try ParseCommand.parse([resume.path, "--workspace", noted.path,
+                                                 "--config", config.path,
+                                                 "--notes", "Include my Sparra side project."])
+        try await notedParse.run()
+        let notedInputs = try ArtifactStore(root: noted).read(.inputs, as: InputsData.self)
+
+        #expect(bareInputs.data.userNotes == nil)
+        #expect(notedInputs.data.userNotes == "Include my Sparra side project.")
+        #expect(notedInputs.data.markdownHash != bareInputs.data.markdownHash)
+    }
+
+    /// The generate stages read notes back out of inputs.json — without this the stepwise
+    /// prompt bundle silently drops context that the internal `convert` path honours.
+    @Test func generateExternalPromptCarriesNotesFromInputs() async throws {
+        let project = FileManager.default.temporaryDirectory
+            .appendingPathComponent("jpresume-notes-gen-\(UUID().uuidString)", isDirectory: true)
+        let workspace = project.appendingPathComponent(".jpresume", isDirectory: true)
+        try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: project) }
+
+        let store = ArtifactStore(root: workspace)
+        let hash = "notes-hash"
+        let inputs = InputsData(sourcePath: "/tmp/resume.md", markdownHash: hash, config: JapanConfig(),
+                                userNotes: "Target a general backend role, not iOS.")
+        try store.write(inputs, kind: .inputs, contentHash: hash, inputsHash: hash,
+                        producedBy: "jpresume/test")
+        try store.write(NormalizedResume(name: "Jane Doe"), kind: .repaired,
+                        contentHash: hash, inputsHash: hash, producedBy: "jpresume/test")
+
+        func bundle(for stage: String) throws -> PromptBundle {
+            let data = try Data(contentsOf: workspace.appendingPathComponent("\(stage).prompt.json"))
+            return try JSONDecoder().decode(PromptBundle.self, from: data)
+        }
+
+        let rirekisho = try GenerateRirekishoCommand.parse(["--workspace", workspace.path, "--external"])
+        try await rirekisho.run()
+        let shokumu = try GenerateShokumukeirekishoCommand.parse(["--workspace", workspace.path, "--external"])
+        try await shokumu.run()
+
+        for stage in ["rirekisho", "shokumukeirekisho"] {
+            let promptBundle = try bundle(for: stage)
+            #expect(promptBundle.user.contains("additional_context"))
+            #expect(promptBundle.user.contains("general backend role"))
+        }
     }
 
     // MARK: - Fixtures

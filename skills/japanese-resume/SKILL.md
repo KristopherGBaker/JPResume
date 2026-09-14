@@ -50,6 +50,9 @@ If the user mentions facts not present in the resume or `jpresume_config.yaml` �
 ```bash
 jpresume convert resume.md --notes "I also did a 2008-2010 contract role at PrototypeCo as an iOS developer."
 jpresume convert resume.md --notes notes/extras.md
+
+# stepwise: pass them to parse — they land in inputs.json and reach normalize and both generate stages
+jpresume parse resume.pdf --workspace .jpresume --notes notes/extras.md
 ```
 
 The flag accepts either a file path or inline text. Notes flow into every LLM stage as `additional_context` and fold into the inputs hash (so editing them invalidates the cache). Use this when the user has extra info that doesn't fit cleanly in `work_japanese` / `education_japanese` config fields — for one-off context, freeform notes are friction-free; for structured timeline additions the candidate plans to reuse, prefer editing `jpresume_config.yaml` so it persists across projects.

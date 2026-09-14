@@ -40,12 +40,14 @@ accept `--external` (write a prompt bundle and exit; caller performs inference) 
 application mode (adjusts 志望動機, 職務要約, 自己PR, role/achievement emphasis).
 `convert` also accepts `--target`. Changing the target file invalidates the artifact cache.
 
-`convert` also accepts `--notes <path-or-text>` — free-form supplementary context
+`convert` and `parse` both accept `--notes <path-or-text>` — free-form supplementary context
 from the candidate (extra work/education history not on the resume, style or
 emphasis preferences, corrections). Auto-detects whether the argument is a file
 path or inline text. Stored in `InputsData.user_notes` and folded into the
 inputs hash so changes invalidate the entire downstream cache. Reaches every
-LLM stage as `additional_context` in the user payload.
+LLM stage as `additional_context` in the user payload — `normalize` and both
+`generate` subcommands read it back out of `inputs.json`, so stepwise/external
+runs see the same notes the one-shot `convert` path does.
 
 ## Architecture
 

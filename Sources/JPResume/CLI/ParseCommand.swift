@@ -20,6 +20,14 @@ struct ParseCommand: AsyncParsableCommand {
     @Flag(help: "Re-prompt for all Japan-specific fields")
     var reconfigure = false
 
+    @Option(help: """
+    Free-form notes for the LLM (extra work/education history, style preferences, etc). \
+    Accepts either a path to a text/markdown file or inline text. Stored in inputs.json \
+    and folded into the inputs hash, so every downstream stage sees them and changing \
+    them invalidates the workspace cache.
+    """)
+    var notes: String?
+
     func run() async throws {
         let inputURL = URL(fileURLWithPath: input)
         guard FileManager.default.fileExists(atPath: inputURL.path) else {
@@ -47,7 +55,9 @@ struct ParseCommand: AsyncParsableCommand {
             path: configURL, western: western, forceReconfigure: reconfigure
         )
         let configData = try? JSONCoders.sorted.encode(japanConfig)
-        let inputsHash = ArtifactHashes.inputs(markdownContent: preprocessed.cleanedText, configData: configData)
+        let resolvedNotes = try resolveNotes(notes)
+        let inputsHash = ArtifactHashes.inputs(markdownContent: preprocessed.cleanedText,
+                                               configData: configData, notes: resolvedNotes)
         let by = ProducedBy.jpresume()
 
         let inputsData = InputsData(
@@ -57,7 +67,8 @@ struct ParseCommand: AsyncParsableCommand {
             sourceKind: sourceKind,
             sourceText: text,
             cleanedText: preprocessed.cleanedText,
-            preprocessingNotes: preprocessed.notes
+            preprocessingNotes: preprocessed.notes,
+            userNotes: resolvedNotes
         )
         try store.write(inputsData, kind: .inputs, contentHash: inputsHash, inputsHash: inputsHash, producedBy: by)
         try store.write(western, kind: .parsed, contentHash: inputsHash, inputsHash: inputsHash, producedBy: by)
