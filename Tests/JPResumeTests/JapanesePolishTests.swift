@@ -246,4 +246,13 @@ struct JapanesePolishTests {
         let options = GenerationOptions(includeOlderIrrelevantRoles: false)
         #expect(!options.includeOlderIrrelevantRoles)
     }
+
+    @Test func keepsProductOnboardingAsKatakana() {
+        // Product onboarding is the user's first-run experience, not employee training.
+        let result = JapanesePolishRules.normalizeJapanesePhrases(
+            "オンボーディング画面の設計・実装を担当。")
+        #expect(result.contains("オンボーディング"))
+        #expect(!result.contains("新人教育"))
+    }
+
 }

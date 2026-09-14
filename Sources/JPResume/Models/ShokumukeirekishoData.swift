@@ -50,4 +50,25 @@ struct ShokumukeirekishoData: Codable, Sendable {
         case technicalSkills = "technical_skills"
         case selfPr = "self_pr"
     }
+
+    /// The skill taxonomy the generator is told to use, in the order a Japanese reader
+    /// expects: concrete first (languages, frameworks), practice next, catch-all last.
+    static let skillCategoryOrder = ["言語", "フレームワーク", "設計・開発", "品質・改善", "AI関連", "その他"]
+
+    /// `technicalSkills` is a dictionary, so iterating it directly renders the categories
+    /// in hash order — a different order on every run. Renderers use this instead:
+    /// known categories in taxonomy order, then any others alphabetically.
+    var orderedTechnicalSkills: [(category: String, skills: [String])] {
+        let order = Self.skillCategoryOrder
+        return technicalSkills
+            .sorted { lhs, rhs in
+                switch (order.firstIndex(of: lhs.key), order.firstIndex(of: rhs.key)) {
+                case let (l?, r?): return l < r
+                case (_?, nil): return true
+                case (nil, _?): return false
+                case (nil, nil): return lhs.key < rhs.key
+                }
+            }
+            .map { (category: $0.key, skills: $0.value) }
+    }
 }

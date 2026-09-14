@@ -125,7 +125,7 @@ enum ShokumukeirekishoPDFRenderer {
 
         let skillFont = PDFFont.japanese(size: 8)
         let skillBoldFont = PDFFont.japaneseBold(size: 8)
-        for (category, skills) in data.technicalSkills {
+        for (category, skills) in data.orderedTechnicalSkills {
             let label = "\(category): "
             let labelWidth = measureText(label, font: skillBoldFont)
             let skillsText = skills.joined(separator: ", ")

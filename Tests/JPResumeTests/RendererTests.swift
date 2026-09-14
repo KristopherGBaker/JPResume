@@ -76,4 +76,24 @@ struct RendererTests {
         #expect(md.contains("Python"))
         #expect(md.contains("自己PR"))
     }
+
+    @Test func skillCategoriesRenderInTaxonomyOrder() {
+        let data = ShokumukeirekishoData(
+            creationDate: "2026年9月14日", name: "テスト", careerSummary: "要約", workDetails: [],
+            technicalSkills: [
+                "その他": ["SQLite"], "AI関連": ["LLM"], "言語": ["Swift"],
+                "品質・改善": ["CI/CD"], "フレームワーク": ["SwiftUI"], "設計・開発": ["API設計"],
+                "資格": ["N3"]
+            ],
+            selfPr: nil
+        )
+        #expect(data.orderedTechnicalSkills.map(\.category)
+                == ["言語", "フレームワーク", "設計・開発", "品質・改善", "AI関連", "その他", "資格"])
+
+        let md = MarkdownRenderer.renderShokumukeirekisho(data)
+        let positions = ["言語", "フレームワーク", "AI関連", "その他"].compactMap { md.range(of: "| \($0) |")?.lowerBound }
+        #expect(positions.count == 4)
+        #expect(positions == positions.sorted())
+    }
+
 }

@@ -132,7 +132,7 @@ enum MarkdownRenderer {
 
         // Technical skills
         lines.append("## 活かせる経験・知識・技術\n")
-        for (category, skills) in data.technicalSkills {
+        for (category, skills) in data.orderedTechnicalSkills {
             lines.append("| \(category) | \(skills.joined(separator: ", ")) |")
         }
         lines.append("")

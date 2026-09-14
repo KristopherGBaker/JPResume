@@ -169,7 +169,9 @@ enum JapanesePolishRules {
         ("ゼロからの構築", "新規構築"),
         ("スケーラビリティ", "拡張性"),
         ("リファクタリング", "リファクタリング"),  // keep as-is, widely used
-        ("オンボーディング", "新人教育・導入支援"),
+        // "オンボーディング" is left alone: in product work it means the user's first-run
+        // experience, and rewriting it to 新人教育・導入支援 turns a product feature into
+        // employee training. SystemPrompts tells the generator the same thing.
         ("メンタリング", "メンタリング"),  // keep as-is
         ("コードレビュー", "コードレビュー"),  // keep as-is
     ]
