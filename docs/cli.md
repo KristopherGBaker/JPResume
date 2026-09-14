@@ -96,7 +96,7 @@ Each stage writes a versioned JSON artifact into `.jpresume/`. Reruns skip uncha
 For human review between stages or for use by an agent skill:
 
 ```
-jpresume parse <input.md|.docx|.pdf> [--workspace .jpresume]
+jpresume parse <input.md|.docx|.pdf> [--workspace .jpresume] [--notes <path-or-text>]
 jpresume normalize [--workspace] [--provider] [--external | --ingest]
 jpresume validate [--workspace] [--on normalized|repaired]
 jpresume repair [--workspace]
