@@ -41,6 +41,9 @@ enum ResumeConsistencyChecker {
     /// Detect and repair overlapping roles where the overlap is likely unintentional.
     /// A freelance/contract role starting before the prior full-time role ends is repaired
     /// by pushing the later role's start to the prior role's end month.
+    ///
+    /// Side projects are exempt: a personal project run alongside a salaried role overlaps
+    /// it by definition, so "repairing" the overlap would rewrite a true start date.
     static func repairOverlaps(
         _ entries: [NormalizedWorkEntry],
         repairs: inout [RepairNote]
@@ -53,6 +56,7 @@ enum ResumeConsistencyChecker {
             let next = result[i + 1]
 
             guard !current.isCurrent else { continue }
+            guard current.isSideProject != true, next.isSideProject != true else { continue }
             guard let currentEnd = current.endDate,
                   let nextStart = next.startDate else { continue }
 
@@ -99,9 +103,11 @@ enum ResumeConsistencyChecker {
                 ))
             }
 
-            // If it's not the last entry and is current with no end date,
-            // it's likely wrong unless it's genuinely concurrent
-            if entry.isCurrent && entry.endDate == nil && i < result.count - 1 {
+            // If it's not the last entry and is current with no end date, it's likely wrong
+            // unless it's genuinely concurrent. An ongoing side project is genuinely
+            // concurrent — closing it out would invent an end date it does not have.
+            if entry.isCurrent && entry.endDate == nil && entry.isSideProject != true
+                && i < result.count - 1 {
                 // Only repair if a later role also exists with a start date after this one
                 let laterRoles = result[(i + 1)...]
                 let hasLaterRole = laterRoles.contains { later in

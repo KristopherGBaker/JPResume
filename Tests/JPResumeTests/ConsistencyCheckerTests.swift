@@ -14,9 +14,10 @@ struct ConsistencyCheckerTests {
         end: StructuredDate? = nil,
         isCurrent: Bool = false,
         location: String? = nil,
-        bullets: [NormalizedBullet] = []
+        bullets: [NormalizedBullet] = [],
+        isSideProject: Bool? = nil
     ) -> NormalizedWorkEntry {
-        NormalizedWorkEntry(
+        var entry = NormalizedWorkEntry(
             company: company,
             title: title,
             startDate: start,
@@ -25,6 +26,8 @@ struct ConsistencyCheckerTests {
             location: location,
             bullets: bullets
         )
+        entry.isSideProject = isSideProject
+        return entry
     }
 
     private func makeResume(experience: [NormalizedWorkEntry]) -> NormalizedResume {
@@ -137,6 +140,39 @@ struct ConsistencyCheckerTests {
         let result = ResumeConsistencyChecker.check(makeResume(experience: entries))
         let overlapRepairs = result.repairs.filter { $0.reason.contains("Overlap") }
         #expect(overlapRepairs.isEmpty)
+    }
+
+    @Test func sideProjectOverlapKeepsItsRealStartDate() {
+        // A personal project started while still employed overlaps by definition —
+        // pushing its start to the end of the job would rewrite a true date.
+        let entries = [
+            work(company: "Employer", start: StructuredDate(year: 2023, month: 5),
+                 end: StructuredDate(year: 2026, month: 9)),
+            work(company: "Side Project", start: StructuredDate(year: 2026, month: 6),
+                 isSideProject: true)
+        ]
+        let result = ResumeConsistencyChecker.check(makeResume(experience: entries))
+        let side = result.experience.first { $0.company == "Side Project" }
+
+        #expect(side?.startDate?.year == 2026)
+        #expect(side?.startDate?.month == 6)
+        #expect(!result.repairs.contains { $0.reason.contains("Overlap") })
+    }
+
+    @Test func ongoingSideProjectStaysCurrentWithoutInventedEndDate() {
+        // The side project sorts before a later-starting role, but it is genuinely
+        // concurrent: it must keep is_current and must not be given an end date.
+        let entries = [
+            work(company: "Side Project", start: StructuredDate(year: 2026, month: 4),
+                 isCurrent: true, isSideProject: true),
+            work(company: "Employer", start: StructuredDate(year: 2026, month: 6),
+                 end: StructuredDate(year: 2026, month: 12))
+        ]
+        let result = ResumeConsistencyChecker.check(makeResume(experience: entries))
+        let side = result.experience.first { $0.company == "Side Project" }
+
+        #expect(side?.isCurrent == true)
+        #expect(side?.endDate == nil)
     }
 
     // MARK: - Chronological sorting

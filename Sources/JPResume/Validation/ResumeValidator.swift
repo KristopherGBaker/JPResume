@@ -96,6 +96,8 @@ enum ResumeValidator {
                 let a = sortedWork[i]
                 let b = sortedWork[j]
                 guard a.startDate != nil, let bStart = b.startDate else { continue }
+                // A side project running alongside a salaried role is expected, not a conflict.
+                guard a.isSideProject != true, b.isSideProject != true else { continue }
                 let aEnd = a.isCurrent ? nil : a.endDate
                 guard let aEndDate = aEnd else { continue } // current role can overlap
                 // Only warn when the overlap is unambiguous:

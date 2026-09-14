@@ -116,6 +116,16 @@ struct ValidatorTests {
         #expect(result.warnings.contains { $0.message.contains("Overlapping") })
     }
 
+    @Test func noWarnWhenOverlapIsASideProject() {
+        var side = work(company: "Side Project", start: StructuredDate(year: 2020, month: 1),
+                        end: StructuredDate(year: 2023, month: 1))
+        side.isSideProject = true
+        let job = work(company: "Employer", start: StructuredDate(year: 2018, month: 1),
+                       end: StructuredDate(year: 2022, month: 6))
+        let result = ResumeValidator.validate(makeResume(experience: [job, side]))
+        #expect(!result.warnings.contains { $0.message.contains("Overlapping") })
+    }
+
     @Test func noWarnSequentialRoles() {
         let a = work(company: "A", start: StructuredDate(year: 2018), end: StructuredDate(year: 2020))
         let b = work(company: "B", start: StructuredDate(year: 2020), end: StructuredDate(year: 2023))
