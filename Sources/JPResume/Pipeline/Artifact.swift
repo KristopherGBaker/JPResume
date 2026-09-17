@@ -159,7 +159,7 @@ enum ArtifactHashes {
 /// Provider slug is the provider raw value (e.g. "anthropic", "ollama").
 enum ProducedBy {
     static let actor = "jpresume"
-    static let version = "0.6.1"
+    static let version = "0.7.0"
 
     static func jpresume() -> String { "\(actor)/\(version)" }
 
