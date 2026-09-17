@@ -18,11 +18,15 @@ enum ShokumukeirekishoPDFRenderer {
         let contentW = pageW - 2 * margin
         var y = pageH - margin
 
+        func startNewPage() -> CGFloat {
+            ctx.endPage()
+            ctx.beginPage(mediaBox: &mediaBox)
+            return pageH - margin
+        }
+
         func newPageIfNeeded(needed: CGFloat) {
             if y - needed < margin {
-                ctx.endPage()
-                ctx.beginPage(mediaBox: &mediaBox)
-                y = pageH - margin
+                y = startNewPage()
             }
         }
 
@@ -50,7 +54,8 @@ enum ShokumukeirekishoPDFRenderer {
         y -= 20
 
         y = drawParagraph(data.careerSummary, at: CGPoint(x: margin, y: y),
-                          maxWidth: contentW, font: PDFFont.japanese(size: 9), lineHeight: 14, in: ctx)
+                          maxWidth: contentW, font: PDFFont.japanese(size: 9), lineHeight: 14,
+                          bottom: margin, in: ctx, newPage: startNewPage)
         y -= 14
 
         drawHR(ctx: ctx, y: y, x: margin, w: contentW)
@@ -155,14 +160,19 @@ enum ShokumukeirekishoPDFRenderer {
 
         // Self PR
         if let pr = data.selfPr {
-            newPageIfNeeded(needed: 40)
+            // Keep the whole 自己PR on one page when it can fit on one — a few orphan lines
+            // after the page break read badly on a 職務経歴書. If it is taller than a page it
+            // simply flows, because drawParagraph paginates.
+            let prFont = PDFFont.japanese(size: 9)
+            let prHeight = paragraphHeight(pr, maxWidth: contentW, font: prFont)
+            newPageIfNeeded(needed: min(20 + prHeight, pageH - 2 * margin))
             drawText("自己PR", at: CGPoint(x: margin, y: y - 12),
                      font: PDFFont.japaneseBold(size: 12), in: ctx)
             y -= 20
 
-            _ = drawParagraph(pr, at: CGPoint(x: margin, y: y),
-                              maxWidth: contentW, font: PDFFont.japanese(size: 9),
-                              lineHeight: 14, in: ctx)
+            y = drawParagraph(pr, at: CGPoint(x: margin, y: y),
+                              maxWidth: contentW, font: prFont,
+                              lineHeight: 14, bottom: margin, in: ctx, newPage: startNewPage)
         }
 
         ctx.endPage()
@@ -234,26 +244,71 @@ enum ShokumukeirekishoPDFRenderer {
     }
 
     @discardableResult
+    /// Height `text` needs when wrapped to `maxWidth`.
+    private static func paragraphHeight(_ text: String, maxWidth: CGFloat, font: NSFont) -> CGFloat {
+        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black]
+        let framesetter = CTFramesetterCreateWithAttributedString(
+            NSAttributedString(string: text, attributes: attrs))
+        return CTFramesetterSuggestFrameSizeWithConstraints(
+            framesetter, CFRange(location: 0, length: 0), nil,
+            CGSize(width: maxWidth, height: CGFloat.greatestFiniteMagnitude), nil
+        ).height
+    }
+
+    /// Draw `text` downward from `point`, spilling onto fresh pages whenever the space above
+    /// `bottom` runs out. Drawing the whole paragraph as one frame silently clips anything
+    /// past the page edge, which is how a long 自己PR used to lose its last sentences.
+    /// Returns the y to continue from.
     private static func drawParagraph(_ text: String, at point: CGPoint,
                                       maxWidth: CGFloat, font: NSFont,
-                                      lineHeight: CGFloat, in ctx: CGContext) -> CGFloat {
+                                      lineHeight: CGFloat, bottom: CGFloat,
+                                      in ctx: CGContext,
+                                      newPage: () -> CGFloat) -> CGFloat {
         let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black]
         let attrStr = NSAttributedString(string: text, attributes: attrs)
         let framesetter = CTFramesetterCreateWithAttributedString(attrStr)
+        let total = attrStr.length
 
-        // Measure needed height
-        let suggestedSize = CTFramesetterSuggestFrameSizeWithConstraints(
-            framesetter, CFRange(location: 0, length: 0),
-            nil, CGSize(width: maxWidth, height: CGFloat.greatestFiniteMagnitude), nil
-        )
+        var start = 0
+        var y = point.y
+        var onFreshPage = false
 
-        let path = CGMutablePath()
-        let frameRect = CGRect(x: point.x, y: point.y - suggestedSize.height,
-                               width: maxWidth, height: suggestedSize.height)
-        path.addRect(frameRect)
-        let frame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), path, nil)
-        CTFrameDraw(frame, ctx)
+        while start < total {
+            if y - bottom < lineHeight {
+                if onFreshPage { break } // a single line will not fit anywhere; stop rather than loop
+                y = newPage()
+                onFreshPage = true
+                continue
+            }
 
-        return point.y - suggestedSize.height
+            let available = y - bottom
+            let path = CGMutablePath()
+            path.addRect(CGRect(x: point.x, y: y - available, width: maxWidth, height: available))
+            let frame = CTFramesetterCreateFrame(framesetter, CFRange(location: start, length: 0),
+                                                 path, nil)
+            CTFrameDraw(frame, ctx)
+
+            let visible = CTFrameGetVisibleStringRange(frame)
+            guard visible.length > 0 else {
+                if onFreshPage { break }
+                y = newPage()
+                onFreshPage = true
+                continue
+            }
+
+            let used = CTFramesetterSuggestFrameSizeWithConstraints(
+                framesetter, CFRange(location: start, length: visible.length),
+                nil, CGSize(width: maxWidth, height: CGFloat.greatestFiniteMagnitude), nil
+            ).height
+
+            start += visible.length
+            y -= used
+            if start < total {
+                y = newPage()
+                onFreshPage = true
+            }
+        }
+
+        return y
     }
 }
