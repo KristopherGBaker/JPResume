@@ -135,8 +135,8 @@ enum Stages {
         MarkdownRenderer.renderShokumukeirekisho(shokumukeirekisho)
     }
 
-    static func renderPDF(rirekisho: RirekishoData, to url: URL) throws {
-        try RirekishoPDFRenderer.render(data: rirekisho, to: url)
+    static func renderPDF(rirekisho: RirekishoData, to url: URL, photo: URL? = nil) throws {
+        try RirekishoPDFRenderer.render(data: rirekisho, to: url, photo: photo)
     }
 
     static func renderPDF(shokumukeirekisho: ShokumukeirekishoData, to url: URL) throws {

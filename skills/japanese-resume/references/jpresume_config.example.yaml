@@ -13,6 +13,8 @@ address_current:
   furigana: ちよだ1-1-1
 phone: 090-1234-5678
 email: john.smith@example.com
+# Optional 3x4cm photo for the rirekisho PDF; relative to this file's directory.
+# photo_path: photo.png
 spouse: false
 dependents: 0
 dependents_excl_spouse: 0

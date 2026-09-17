@@ -24,13 +24,15 @@ enum RirekishoPDFRenderer {
     private static let rowH: CGFloat = 15.59 // 5.5mm
     private static let smallH: CGFloat = 14.17 // 5mm
 
-    static func render(data: RirekishoData, to url: URL) throws {
+    /// - Parameter photo: resolved location of the 3×4cm 写真. When nil (or undecodable)
+    ///   the box is drawn empty, as before.
+    static func render(data: RirekishoData, to url: URL, photo: URL? = nil) throws {
         var mediaBox = CGRect(x: 0, y: 0, width: pageW, height: pageH)
         guard let ctx = CGContext(url as CFURL, mediaBox: &mediaBox, nil) else {
             throw PDFError.cannotCreate
         }
         ctx.beginPage(mediaBox: &mediaBox)
-        draw(data: data, in: ctx, mediaBox: &mediaBox)
+        draw(data: data, in: ctx, mediaBox: &mediaBox, photo: photo.flatMap(RirekishoPhoto.load))
         ctx.endPage()
         ctx.closePDF()
     }
@@ -46,7 +48,8 @@ enum RirekishoPDFRenderer {
     }
 
     // swiftlint:disable:next function_body_length
-    private static func draw(data: RirekishoData, in ctx: CGContext, mediaBox: inout CGRect) {
+    private static func draw(data: RirekishoData, in ctx: CGContext, mediaBox: inout CGRect,
+                             photo: CGImage? = nil) {
         let x0 = margin
         var y = pageH - margin // Start from top
 
@@ -61,22 +64,23 @@ enum RirekishoPDFRenderer {
         let infoW = contentW - photoW - 5.67 // 2mm gap
         let labelW: CGFloat = 62.36 // 22mm
 
-        // Furigana row
-        let furiH: CGFloat = 14.17 // 5mm
+        // Furigana / name / DOB rows together are exactly as tall as the 40mm photo box
+        // beside them, so the personal-info block reads as one rectangle.
+        let furiH: CGFloat = 19.84 // 7mm
         drawLabelRow(ctx: ctx, x: x0, y: y, w: infoW, h: furiH,
                      labelW: labelW, label: "ふりがな", value: data.nameFurigana,
                      labelSize: 6, valueSize: 6)
         y -= furiH
 
         // Name row
-        let nameH: CGFloat = 34.02 // 12mm
+        let nameH: CGFloat = 62.36 // 22mm
         drawLabelRow(ctx: ctx, x: x0, y: y, w: infoW, h: nameH,
                      labelW: labelW, label: "氏　名", value: data.nameKanji,
                      labelSize: 7, valueSize: 14)
         y -= nameH
 
-        // DOB / Gender row
-        let dobH: CGFloat = 19.84 // 7mm
+        // DOB / Gender row — takes up whatever the photo box has left
+        let dobH: CGFloat = photoH - furiH - nameH
         drawBox(ctx: ctx, x: x0, y: y, w: infoW, h: dobH)
         var dobText = "生年月日　\(data.dateOfBirth)"
         if let gender = data.gender {
@@ -88,13 +92,20 @@ enum RirekishoPDFRenderer {
 
         // Photo box (spans all three rows above)
         let photoX = x0 + infoW + 5.67
-        let photoTop = y + furiH + nameH + dobH
-        let photoTotalH = furiH + nameH + dobH
-        drawBox(ctx: ctx, x: photoX, y: photoTop, w: photoW, h: photoTotalH)
-        drawTextCentered("写真", at: CGPoint(x: photoX + photoW / 2, y: photoTop - photoTotalH / 2 + 4),
-                         font: PDFFont.japanese(size: 7), in: ctx)
-        drawTextCentered("(3×4cm)", at: CGPoint(x: photoX + photoW / 2, y: photoTop - photoTotalH / 2 - 8),
-                         font: PDFFont.japanese(size: 5), in: ctx)
+        let photoTop = y + photoH
+        if let photo {
+            // Inset by the border so the image sits inside the rule, not under it.
+            let inset = CGRect(x: photoX + 0.5, y: photoTop - photoH + 0.5,
+                               width: photoW - 1, height: photoH - 1)
+            RirekishoPhoto.draw(photo, in: inset, ctx: ctx)
+            drawBox(ctx: ctx, x: photoX, y: photoTop, w: photoW, h: photoH)
+        } else {
+            drawBox(ctx: ctx, x: photoX, y: photoTop, w: photoW, h: photoH)
+            drawTextCentered("写真", at: CGPoint(x: photoX + photoW / 2, y: photoTop - photoH / 2 + 4),
+                             font: PDFFont.japanese(size: 7), in: ctx)
+            drawTextCentered("(3×4cm)", at: CGPoint(x: photoX + photoW / 2, y: photoTop - photoH / 2 - 8),
+                             font: PDFFont.japanese(size: 5), in: ctx)
+        }
 
         // ===== ADDRESS =====
         // Address furigana

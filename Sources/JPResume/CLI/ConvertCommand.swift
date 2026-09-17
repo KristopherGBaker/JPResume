@@ -181,7 +181,11 @@ struct ConvertCommand: AsyncParsableCommand {
 
         // Step 5b: Polish
         let derived = repaired.derivedExperience
-        let polishedRirekisho = jpResult.rirekisho.map { Stages.polish($0, derived: derived) }
+        let polishedRirekisho = jpResult.rirekisho.map { data -> RirekishoData in
+            var polished = Stages.polish(data, derived: derived)
+            polished.photoPath = polished.photoPath ?? japanConfig.photoPath
+            return polished
+        }
         let polishedShokumu = jpResult.shokumukeirekisho.map { Stages.polish($0, derived: derived) }
 
         if let r = polishedRirekisho {
@@ -196,7 +200,15 @@ struct ConvertCommand: AsyncParsableCommand {
         // Step 6: Render
         print("\nStep 6: Generating output files...")
         try FileManager.default.createDirectory(at: outputURL, withIntermediateDirectories: true)
-        try renderOutput(rirekisho: polishedRirekisho, shokumukeirekisho: polishedShokumu, to: outputURL)
+        let photo = RirekishoPhoto.resolve(japanConfig.photoPath, relativeTo: [
+            workspaceURL.deletingLastPathComponent(), workspaceURL,
+            URL(fileURLWithPath: FileManager.default.currentDirectoryPath),
+        ])
+        if japanConfig.photoPath != nil, photo == nil {
+            print("  ! photo_path not found — leaving the 写真 box empty")
+        }
+        try renderOutput(rirekisho: polishedRirekisho, shokumukeirekisho: polishedShokumu,
+                         to: outputURL, photo: photo)
 
         let leftover = jpResult.rirekishoWarnings.count + jpResult.shokumuWarnings.count
         if leftover > 0 {
@@ -334,7 +346,8 @@ extension ConvertCommand {
     private func renderOutput(
         rirekisho rirekishoData: RirekishoData?,
         shokumukeirekisho shokumuData: ShokumukeirekishoData?,
-        to outputURL: URL
+        to outputURL: URL,
+        photo: URL? = nil
     ) throws {
         let wantMarkdown = format == .markdown || format == .both
         let wantPDF = format == .pdf || format == .both
@@ -347,7 +360,7 @@ extension ConvertCommand {
             }
             if wantPDF {
                 let path = outputURL.appendingPathComponent("rirekisho.pdf")
-                try Stages.renderPDF(rirekisho: data, to: path)
+                try Stages.renderPDF(rirekisho: data, to: path, photo: photo)
                 print("  ✓ \(path.path)")
             }
         }

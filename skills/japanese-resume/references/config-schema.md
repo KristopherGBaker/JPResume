@@ -29,6 +29,10 @@ address_current:
 phone: 090-1234-5678
 email: john.smith@example.com
 
+# 3×4cm 履歴書 photo. Relative paths resolve against this config's directory.
+# Omit it and the 写真 box is drawn empty.
+photo_path: photo.png
+
 # Household fields (optional but expected on traditional 履歴書).
 spouse: false                 # 配偶者
 dependents: 0                 # 扶養家族数（配偶者除く）
@@ -104,6 +108,18 @@ licenses:
 - Japanese convention lists certifications chronologically by acquisition date with Japanese date format.
 - JLPT results, driver's licenses, professional certifications all go here.
 
+### `photo_path`
+
+- The 証明写真 that goes in the 3×4cm box at the top right of the 履歴書 PDF. PNG, JPEG,
+  HEIC and TIFF are accepted; EXIF rotation is honoured.
+- A relative path is resolved against the config's directory (then the workspace, then the
+  current directory); `~` and absolute paths work too.
+- The image is scaled to fill the box and centre-cropped on the overflowing axis, so supply
+  a 3:4 crop (e.g. 900×1200) if you want to control the framing yourself.
+- Markdown output has no photo — this only affects the PDF.
+- Setting it does not invalidate any artifact: a plain `jpresume render rirekisho` picks the
+  photo up, no LLM stage re-runs.
+
 ## When to edit config vs. edit `normalized.json`
 
 | Concern | Edit which |
@@ -112,5 +128,6 @@ licenses:
 | Bullet classification (achievement vs responsibility), skill grouping | `normalized.json` directly, then `repair` |
 | Japanese phrasing of a specific sentence in the output | `rirekisho.json` / `shokumukeirekisho.json` directly, then `render` |
 | Global era change (western ↔ reiwa) | Re-run `generate` stages with `--era` flag; no config change needed |
+| Adding or replacing the 履歴書 photo | `jpresume_config.yaml` `photo_path` — then re-run `parse` + `render rirekisho` |
 
 Editing the config triggers a full hash invalidation (via `inputs.json`), so every downstream stage reruns. Editing `normalized.json` only invalidates from `repair` onward. Editing the final JSON only invalidates `render`.

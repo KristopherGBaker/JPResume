@@ -36,6 +36,7 @@ struct RenderCommand: AsyncParsableCommand {
         if target == .rirekisho || target == .both {
             let artifact = try store.read(.rirekisho, as: RirekishoData.self)
             let data = artifact.data
+            let photo = wantPDF ? resolvePhoto(data: data, workspace: workspaceURL, store: store) : nil
             if wantMarkdown {
                 let path = outputURL.appendingPathComponent("rirekisho.md")
                 try Stages.renderMarkdown(rirekisho: data).write(to: path, atomically: true, encoding: .utf8)
@@ -43,7 +44,7 @@ struct RenderCommand: AsyncParsableCommand {
             }
             if wantPDF {
                 let path = outputURL.appendingPathComponent("rirekisho.pdf")
-                try Stages.renderPDF(rirekisho: data, to: path)
+                try Stages.renderPDF(rirekisho: data, to: path, photo: photo)
                 print("  ✓ \(path.path)")
             }
         }
@@ -62,6 +63,32 @@ struct RenderCommand: AsyncParsableCommand {
                 print("  ✓ \(path.path)")
             }
         }
+    }
+
+    /// The 写真 path comes from `rirekisho.json` when it has one, otherwise from the
+    /// config snapshot in `inputs.json` — so a workspace generated before `photo_path`
+    /// was set picks the photo up on a plain re-render.
+    private func resolvePhoto(data: RirekishoData, workspace: URL,
+                              store: ArtifactStore) -> URL? {
+        let configured = (try? store.read(.inputs, as: InputsData.self))?.data.config.photoPath
+        guard let path = data.photoPath ?? configured else { return nil }
+
+        let bases = [workspace.deletingLastPathComponent(), workspace,
+                     URL(fileURLWithPath: FileManager.default.currentDirectoryPath)]
+        guard let url = RirekishoPhoto.resolve(path, relativeTo: bases) else {
+            print("  ! photo_path '\(path)' not found — leaving the 写真 box empty")
+            return nil
+        }
+        let ext = url.pathExtension.lowercased()
+        guard RirekishoPhoto.supportedExtensions.contains(ext) else {
+            print("  ! photo_path '\(path)' is not a supported image (\(RirekishoPhoto.supportedExtensions.sorted().joined(separator: ", ")))")
+            return nil
+        }
+        guard RirekishoPhoto.load(url) != nil else {
+            print("  ! photo_path '\(path)' could not be decoded — leaving the 写真 box empty")
+            return nil
+        }
+        return url
     }
 }
 

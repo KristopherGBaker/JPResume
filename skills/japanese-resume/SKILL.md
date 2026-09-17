@@ -135,6 +135,10 @@ jpresume generate rirekisho --workspace <ws> --ingest
 
 Output: `rirekisho.json` (履歴書 data post-polish). The 履歴書 is a grid-form: name, photo slot, education and work timelines, licenses, 志望動機, 本人希望記入欄.
 
+The photo slot is filled from `photo_path` in `jpresume_config.yaml` (see
+[references/config-schema.md](references/config-schema.md)); it needs no LLM stage, so adding a
+photo to an existing workspace is `jpresume parse …` then `jpresume render rirekisho …`.
+
 Ask user about `--era` before running:
 - `--era western` (default): `2024年3月`
 - `--era japanese`: `令和6年3月`

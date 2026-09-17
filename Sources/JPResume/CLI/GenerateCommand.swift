@@ -98,7 +98,11 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
                 contentHash: contentHash, inputsHash: inputsHash,
                 producedBy: ProducedBy.external(model: model ?? "external"),
                 as: RirekishoData.self
-            ) { Stages.polish($0, derived: repaired.derivedExperience) }
+            ) { data in
+                var polished = Stages.polish(data, derived: repaired.derivedExperience)
+                polished.photoPath = polished.photoPath ?? inputsArtifact.data.config.photoPath
+                return polished
+            }
             return
         }
 
@@ -111,7 +115,8 @@ struct GenerateRirekishoCommand: AsyncParsableCommand {
             targetContext: targetContext, additionalContext: inputsArtifact.data.userNotes,
             model: chatModel, verbose: verbose
         )
-        let polished = Stages.polish(result.data, derived: repaired.derivedExperience)
+        var polished = Stages.polish(result.data, derived: repaired.derivedExperience)
+        polished.photoPath = polished.photoPath ?? inputsArtifact.data.config.photoPath
         try store.write(polished, kind: .rirekisho, contentHash: contentHash, inputsHash: inputsHash,
                         producedBy: ProducedBy.jpresume(providerSlug: provider.rawValue, modelOverride: model),
                         warnings: result.asArtifactWarnings)
